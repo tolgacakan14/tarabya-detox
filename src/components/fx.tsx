@@ -8,6 +8,11 @@ export function Confetti({ fire }: { fire: number }) {
   const [bits, setBits] = useState<{ k: number; dx: number; dy: number; r: number; c: string }[]>([]);
   useEffect(() => {
     if (!fire) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      navigator.vibrate?.(15);
+      return;
+    }
+    navigator.vibrate?.(12);
     const b = Array.from({ length: 28 }, (_, i) => ({
       k: fire * 100 + i,
       dx: (Math.random() - 0.5) * 520,

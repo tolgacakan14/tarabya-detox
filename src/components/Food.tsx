@@ -80,6 +80,20 @@ export default function Food() {
                       {done ? "Yine yedim" : "Yedim ✓"}
                     </button>
                     {!done && (
+                      <button
+                        className="btn btn-ghost press !py-2 !px-3"
+                        aria-label={`${m.slot} öğününün yarısını yedim`}
+                        onClick={async () => {
+                          for (let k = 0; k < m.items.length; k++) {
+                            const it = m.items[k];
+                            await act({ action: "addFood", foodId: it.foodId, qty: Math.max(0.25, it.qty / 2), meal: m.slot, planned: true }, k === m.items.length - 1 ? { toast: "Yarısı kaydedildi" } : undefined);
+                          }
+                        }}
+                      >
+                        ½
+                      </button>
+                    )}
+                    {!done && (
                       <button className="btn btn-ghost press !py-2" onClick={() => reroll(idx)} aria-label={`${m.slot} için başka öneri`}>
                         🔄 Değiştir
                       </button>
