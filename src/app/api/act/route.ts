@@ -126,8 +126,11 @@ async function act(user: UserId, d: string, b: Body) {
     }
     case "measure": {
       const m: Record<string, number> = {};
-      for (const k of ["waist", "arm", "chest", "thigh", "hip"]) if (b[k]) m[k] = num(b[k], 10, 200);
-      await setDaily(user, "measure", d, m);
+      for (const k of ["waist", "arm", "chest", "underbust", "thigh", "hip"]) if (b[k]) m[k] = num(b[k], 10, 200);
+      if (!Object.keys(m).length) throw new Error("En az bir ölçü gir");
+      // merge with anything already measured today instead of overwriting it
+      const prev = (await list<Record<string, number>>(user, "measure", d, d))[0]?.data ?? {};
+      await setDaily(user, "measure", d, { ...prev, ...m });
       return;
     }
     case "foodPref": {

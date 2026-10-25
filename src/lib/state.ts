@@ -5,6 +5,7 @@ import { runEngine, type EngineResult, type FoodEntry } from "./engine";
 import { addDays, daysBetween, today as todayFn, weekStart } from "./dates";
 import { SESSIONS, phaseFor, cardioFor, MINI, EXERCISES } from "./programs";
 import { FOODS } from "./foods";
+import { analyzeBody, type Measure } from "./body";
 
 export interface WorkoutLog {
   type: "strength" | "mini" | "walk" | "run";
@@ -102,7 +103,21 @@ function engineFor(raw: Raw, date: string) {
   const stepsByDate: Record<string, number> = {};
   for (const s of raw.steps) stepsByDate[s.date] = s.data.steps;
   const redFlags = raw.flags.filter((f) => f.date > addDays(date, -14) && f.date <= date).length;
-  return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags);
+  const body = bodyFor(raw, date);
+  const waistTooFast = raw.profile.goal === "gain" && body.waistPerKg !== undefined && body.waistPerKg > 1;
+  return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags, { waistTooFast });
+}
+
+function bodyFor(raw: Raw, date: string) {
+  const ms: Measure[] = raw.measures.filter((m) => m.date <= date).map((m) => ({ date: m.date, ...(m.data as Omit<Measure, "date">) }));
+  const ws = raw.weights.filter((w) => w.date <= date);
+  const current = ws.length ? ws[ws.length - 1].data.kg : raw.profile.startWeight;
+  const firstDate = ms[0]?.date;
+  const atFirst = firstDate ? [...ws].reverse().find((w) => w.date <= firstDate)?.data.kg ?? raw.profile.startWeight : undefined;
+  // use a light 7-day mean so a single noisy weigh-in doesn't move the waist rule
+  const recent = ws.slice(-7).map((w) => w.data.kg);
+  const smooth = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : current;
+  return analyzeBody(raw.profile, ms, smooth, atFirst);
 }
 
 function isTrainingDay(raw: Raw, eng: EngineResult, date: string) {
@@ -358,7 +373,8 @@ export async function buildState(user: UserId) {
       exerciseMemory: mem,
     },
     todayScore,
-    measures: raw.measures.slice(-6).map((m) => ({ date: m.date, ...m.data })),
+    measures: raw.measures.slice(-8).map((m) => ({ date: m.date, ...m.data })),
+    body: bodyFor(raw, today),
     reactions: reactions.map((r) => ({ id: r.id, date: r.date, at: r.created_at, ...r.data })).reverse().slice(0, 8),
     habitDay: eng.dayIndex + 1,
     scores: {

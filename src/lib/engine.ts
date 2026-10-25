@@ -101,7 +101,8 @@ export function runEngine(
   weights: { date: string; weight: number }[],
   intakeByDate: Record<string, number>,
   stepsByDate: Record<string, number>,
-  redFlagsRecent: number
+  redFlagsRecent: number,
+  opts: { waistTooFast?: boolean } = {}
 ): EngineResult {
   const dayIndex = Math.max(0, daysBetween(p.startDate, today));
   const week = Math.floor(dayIndex / 7) + 1;
@@ -172,6 +173,8 @@ export function runEngine(
         insights.push({ tone: "good", text: `Haftada ${weeklyRate.toFixed(2)} kg alıyorsun. Tam hedef bandında.` });
       }
     }
+    // tape-measure rule: waist growing faster than ~1 cm per kg gained → trim the surplus
+    if (opts.waistTooFast) kcal -= 100;
     kcal = Math.max(kcal, tdee + 150);
   } else {
     // Diet-break cycle: 8 weeks deficit, 2 weeks maintenance (MATADOR / ICECAP)

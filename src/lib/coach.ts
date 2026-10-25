@@ -14,6 +14,22 @@ function normTr(s: string) {
   return s.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").trim();
 }
 
+function bodyLine(state: Awaited<ReturnType<typeof buildState>>) {
+  const b = state.body;
+  if (!b.latest) return "henüz yok";
+  const m = b.latest;
+  const parts = [
+    m.waist && `bel ${m.waist}`,
+    m.hip && `kalça ${m.hip}`,
+    m.chest && `göğüs ${m.chest}`,
+    m.underbust && `göğüs alt ${m.underbust}`,
+    m.arm && `kol ${m.arm}`,
+    m.thigh && `üst bacak ${m.thigh}`,
+  ].filter(Boolean);
+  const ratios = [b.whtr && `bel/boy ${b.whtr}`, b.whr && `bel/kalça ${b.whr}`, b.rfm !== undefined && `tahmini yağ %${b.rfm} (${b.rfmBand})`].filter(Boolean);
+  return `${parts.join(", ")} (${m.date}). ${ratios.join(", ")}`;
+}
+
 function prefNames(prefs: Record<string, number> | undefined, test: (v: number) => boolean) {
   return Object.entries(prefs ?? {})
     .filter(([, v]) => test(v))
@@ -83,6 +99,8 @@ const TOOLS: ToolDef[] = [
         arm_cm: { type: "number" },
         chest_cm: { type: "number" },
         thigh_cm: { type: "number" },
+        hip_cm: { type: "number" },
+        underbust_cm: { type: "number", description: "Göğüs altı (sadece Eylül)" },
       },
     },
   },
@@ -193,6 +211,10 @@ ${p.name.toUpperCase()} HAKKINDA
 - Neden istiyor: ${p.why || "henüz sormadın, uygun bir anda sor"}
 - Eğer-ise planları: ${p.ifThen.join(" | ") || "yok"}
 - Notlar: ${p.notes.join(" | ") || "yok"}
+- Vücut ölçüleri (cm, son değerler): ${bodyLine(state)}
+- Ölçü hedefleri: ${state.body.goals.map((g) => `${g.label} ${g.start ?? "?"} → ${g.target} (şimdi ${g.now ?? "?"})`).join("; ") || "henüz ölçü yok"}
+- Ölçü yorumları: ${state.body.insights.join(" ") || "yok"}
+- Kilo alırken bel her kg başına 1 cm'den hızlı büyürse fazla azaltılır. Kilo verirken tartı aynı ama bel inceliyorsa bu başarıdır, kaloriyi kesme. Ölçüleri 2-4 haftada bir, sabah aç karnına almasını hatırlat.
 
 BUGÜN (${trDay(state.today)}, saat ${nowTime()})
 Yenenler:
@@ -267,9 +289,10 @@ async function runTool(user: UserId, name: string, input: Record<string, unknown
         out.push("su");
       }
       const m: Record<string, number> = {};
-      for (const k of ["waist_cm", "arm_cm", "chest_cm", "thigh_cm"]) if (input[k]) m[k.replace("_cm", "")] = Number(input[k]);
+      for (const k of ["waist_cm", "arm_cm", "chest_cm", "thigh_cm", "hip_cm", "underbust_cm"]) if (input[k]) m[k.replace("_cm", "")] = Number(input[k]);
       if (Object.keys(m).length) {
-        await setDaily(user, "measure", date, m);
+        const prev = (await list<Record<string, number>>(user, "measure", date, date))[0]?.data ?? {};
+        await setDaily(user, "measure", date, { ...prev, ...m });
         out.push("ölçüler");
       }
       return out.length ? `Kaydedildi: ${out.join(", ")}.` : "Kaydedilecek değer yoktu.";

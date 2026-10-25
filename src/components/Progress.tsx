@@ -1,4 +1,5 @@
 "use client";
+import { MEASURE_FIELDS } from "@/lib/body";
 import { useState } from "react";
 import { useApp, Section, Stat, fmt } from "./ui";
 
@@ -6,7 +7,6 @@ export default function Progress() {
   const { s, act } = useApp();
   const e = s.engine;
   const gain = s.profile.goal === "gain";
-  const [m, setM] = useState({ waist: "", arm: "", chest: "", thigh: "", hip: "" });
   const [p, setP] = useState({
     targetWeight: String(s.profile.targetWeight),
     likes: s.profile.likes,
@@ -18,7 +18,7 @@ export default function Progress() {
   return (
     <div className="grid grid-cols-1 gap-4">
       <div className="space-y-4">
-        <Section title="Kilo trendi" aside={<span className="label">Günlük tartı dalgalanır, çizgi gerçeği gösterir</span>}>
+        <Section title="Kilo trendi">
           <div className="grid grid-cols-3 gap-3 mb-4">
             <Stat value={e.currentWeight.toLocaleString("tr-TR")} unit="kg" label="Trend kilo" />
             <Stat value={e.weeklyRate === null ? "—" : `${e.weeklyRate > 0 ? "+" : ""}${e.weeklyRate.toLocaleString("tr-TR")}`} unit="kg/hf" label="Haftalık hız" />
@@ -34,66 +34,7 @@ export default function Progress() {
           </ul>
         </Section>
 
-        <Section title="Vücut ölçüleri" aside={<span className="label">2-4 haftada bir, aynı saatte</span>}>
-          <p className="text-sm mb-3" style={{ color: "var(--ink-2)" }}>
-            {gain
-              ? "Kol ve göğüs büyürken bel yavaş artıyorsa kas alıyorsun. Bel kol'dan hızlı artarsa fazlayı azaltırız."
-              : "Kas kazanırken tartı yavaş inebilir ama bel incelir. Bel ölçüsü en dürüst göstergen."}
-          </p>
-          <form
-            className="grid grid-cols-2 gap-2"
-            onSubmit={async (ev) => {
-              ev.preventDefault();
-              if (await act({ action: "measure", ...Object.fromEntries(Object.entries(m).filter(([, v]) => v).map(([k, v]) => [k, Number(v.replace(",", "."))])) }, { toast: "Ölçüler kaydedildi", points: 20 }))
-                setM({ waist: "", arm: "", chest: "", thigh: "", hip: "" });
-            }}
-          >
-            {(
-              [
-                ["waist", "Bel"],
-                ["arm", "Kol"],
-                ["chest", "Göğüs"],
-                ["thigh", "Bacak"],
-                ["hip", "Kalça"],
-              ] as const
-            ).map(([k, l]) => (
-              <label key={k}>
-                <span className="label">{l} (cm)</span>
-                <input className="field num" inputMode="decimal" value={m[k]} onChange={(ev) => setM({ ...m, [k]: ev.target.value })} />
-              </label>
-            ))}
-            <button className="btn btn-me col-span-2" disabled={!Object.values(m).some(Boolean)}>
-              Kaydet
-            </button>
-          </form>
-          {s.measures.length > 0 && (
-            <table className="w-full text-sm mt-4 num">
-              <thead>
-                <tr className="label text-left">
-                  <th className="font-normal">Tarih</th>
-                  <th className="font-normal">Bel</th>
-                  <th className="font-normal">Kol</th>
-                  <th className="font-normal">Göğüs</th>
-                  <th className="font-normal">Bacak</th>
-                  <th className="font-normal">Kalça</th>
-                </tr>
-              </thead>
-              <tbody>
-                {s.measures.map((x) => {
-                  const r = x as unknown as Record<string, number | string>;
-                  return (
-                    <tr key={String(r.date)}>
-                      <td>{String(r.date).slice(5)}</td>
-                      {["waist", "arm", "chest", "thigh", "hip"].map((k) => (
-                        <td key={k}>{r[k] ?? "—"}</td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </Section>
+        <BodyCard />
       </div>
 
       <div className="space-y-4">
@@ -211,5 +152,125 @@ function TrendChart() {
         {data[data.length - 1].date.slice(5)}
       </text>
     </svg>
+  );
+}
+
+function BodyCard() {
+  const { s, act } = useApp();
+  const b = s.body;
+  const fields = MEASURE_FIELDS.filter((f) => f.key !== "underbust" || s.profile.sex === "f");
+  const [m, setM] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState(!b.latest);
+  const female = s.profile.sex === "f";
+
+  return (
+    <section className="panel">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="display text-xl font-bold">Vücut analizi</h2>
+        {b.latest && <span className="label">{b.latest.date.slice(5).split("-").reverse().join(".")} ölçümü</span>}
+      </div>
+
+      {b.latest ? (
+        <>
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {b.whtr !== undefined && (
+              <div className="rounded-2xl p-2.5 text-center" style={{ background: "var(--me-soft)" }}>
+                <p className="display text-2xl font-bold num">{b.whtr.toLocaleString("tr-TR")}</p>
+                <p className="text-[11px] leading-tight" style={{ color: "var(--ink-2)" }}>Bel / boy<br />{b.whtr < 0.5 ? "sağlıklı ✓" : "0.5 altı hedef"}</p>
+              </div>
+            )}
+            {b.whr !== undefined && (
+              <div className="rounded-2xl p-2.5 text-center" style={{ background: "var(--me-soft)" }}>
+                <p className="display text-2xl font-bold num">{b.whr.toLocaleString("tr-TR")}</p>
+                <p className="text-[11px] leading-tight" style={{ color: "var(--ink-2)" }}>Bel / kalça<br />{b.whr < (female ? 0.85 : 0.9) ? "düşük risk ✓" : "dikkat"}</p>
+              </div>
+            )}
+            {b.rfm !== undefined && (
+              <div className="rounded-2xl p-2.5 text-center" style={{ background: "var(--me-soft)" }}>
+                <p className="display text-2xl font-bold num">%{b.rfm.toLocaleString("tr-TR")}</p>
+                <p className="text-[11px] leading-tight" style={{ color: "var(--ink-2)" }}>Tahmini yağ<br />{b.rfmBand}</p>
+              </div>
+            )}
+          </div>
+
+          {b.goals.length > 0 && (
+            <ul className="mt-4 space-y-3">
+              {b.goals.map((g) => {
+                const start = g.start ?? g.now ?? g.target;
+                const now = g.now ?? start;
+                const span = g.target - start;
+                const pct = g.direction === "hold" ? 1 : span === 0 ? 1 : Math.max(0, Math.min(1, (now - start) / span));
+                const delta = Math.round((now - start) * 10) / 10;
+                return (
+                  <li key={g.key}>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-semibold">{g.label}</span>
+                      <span className="num" style={{ color: "var(--ink-2)" }}>
+                        {now} cm{delta !== 0 && ` (${delta > 0 ? "+" : ""}${delta.toLocaleString("tr-TR")})`} → {g.direction === "hold" ? `en fazla ${g.target}` : g.target}
+                      </span>
+                    </div>
+                    <div className="h-2.5 rounded-full overflow-hidden mt-1" style={{ background: "var(--line)" }}>
+                      <div className="h-full rounded-full grad-me transition-[width] duration-700" style={{ width: `${Math.max(4, pct * 100)}%`, opacity: g.direction === "hold" ? 0.45 : 1 }} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {b.insights.length > 0 && (
+            <ul className="mt-4 space-y-1.5 text-sm">
+              {b.insights.map((t, i) => (
+                <li key={i} className="flex gap-2">
+                  <span aria-hidden>💡</span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <p className="mt-2 text-sm" style={{ color: "var(--ink-2)" }}>
+          Mezura ile bel, kalça, göğüs, kol ve üst bacağını ölç. Tartıdan çok daha dürüst bir ilerleme göstergesi.
+        </p>
+      )}
+
+      <button className="btn btn-ghost w-full mt-4 press" onClick={() => setOpen((x) => !x)} aria-expanded={open}>
+        📏 {open ? "Kapat" : "Yeni ölçü gir"}
+      </button>
+      {open && (
+        <form
+          className="grid grid-cols-2 gap-2 mt-3"
+          onSubmit={async (ev) => {
+            ev.preventDefault();
+            const body: Record<string, unknown> = { action: "measure" };
+            for (const [k, v] of Object.entries(m)) if (v) body[k] = Number(v.replace(",", "."));
+            if (await act(body, { toast: "Ölçüler kaydedildi 📏", points: 20, celebrate: true })) {
+              setM({});
+              setOpen(false);
+            }
+          }}
+        >
+          {fields.map((f) => (
+            <label key={f.key}>
+              <span className="label">{f.label(s.profile)} (cm)</span>
+              <input
+                className="field num"
+                inputMode="decimal"
+                placeholder={b.latest?.[f.key] ? String(b.latest[f.key]) : ""}
+                value={m[f.key] ?? ""}
+                onChange={(ev) => setM({ ...m, [f.key]: ev.target.value })}
+              />
+            </label>
+          ))}
+          <button className="btn btn-me col-span-2 press" disabled={!Object.values(m).some(Boolean)}>
+            Kaydet
+          </button>
+          <p className="col-span-2 text-xs" style={{ color: "var(--ink-3)" }}>
+            2-4 haftada bir, sabah aç karnına, mezurayı sıkmadan. Sadece değişenleri yazman yeter.
+          </p>
+        </form>
+      )}
+    </section>
   );
 }
