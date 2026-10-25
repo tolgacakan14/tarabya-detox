@@ -50,7 +50,7 @@ export async function saveProfile(user: UserId, p: Profile) {
   await setDaily(user, "profile", PROFILE_DATE, p);
 }
 
-export const manualDay = (p: Profile) => (p.dayMode ?? (p.id === "tolga" ? "manual" : "calendar")) === "manual";
+export const manualDay = (p: Profile) => (p.dayMode ?? "manual") === "manual"; // both of us end the day ourselves
 
 /** The user's current day. In manual mode the day only changes when they start a new one;
  * after 14:00 we move on by ourselves (nobody is still on "yesterday" by then). */

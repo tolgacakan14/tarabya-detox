@@ -14,7 +14,7 @@ export interface Profile {
   startDate: string; // program week 1 starts here
   activity: number; // starting activity multiplier
   proteinPerKg: number;
-  // "manual": the day ends when you say so (late sleeper), not at midnight. Tolga defaults to manual.
+  // "manual" (default for both): the day ends when you say so, not at midnight.
   dayMode?: "manual" | "calendar";
   activeDate?: string;
   intensity?: "standard" | "intense"; // undefined = intense (we both asked for the faster plan)
