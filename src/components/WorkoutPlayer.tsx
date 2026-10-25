@@ -7,6 +7,7 @@ import { useApp } from "./ui";
 import type { AppState } from "@/lib/state";
 import { EXERCISES, LADDERS, ROUTINES, detectPR, netKcal, readiness, type CardioSession, type CircuitSession, type Effort, type Segment } from "@/lib/training";
 import { MUSCLE_LABEL } from "@/lib/activity";
+import ExerciseDemo from "./ExerciseDemo";
 
 type Session = NonNullable<AppState["program"]["session"]>;
 type Rx = Session["exercises"][number];
@@ -150,6 +151,9 @@ function RoutineRunner({ id, onDone, onSkip }: { id: string; onDone: () => void;
         ))}
       </div>
       <div className="panel mt-4">
+        <div className="rounded-2xl grid place-items-center mb-2" style={{ background: "var(--me-soft)" }}>
+          <ExerciseDemo key={ex.id} pattern={ex.pattern} size={0.8} />
+        </div>
         <h3 className="display text-2xl font-bold">{ex.name}</h3>
         <p className="mt-1 text-lg font-semibold">
           {step.reps ? `${step.reps} tekrar` : `${step.seconds} sn`}
@@ -305,6 +309,9 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
       {phase === "work" && (
         <div className="flex-1 overflow-y-auto p-4 pb-40">
           <div className="panel">
+            <div className="rounded-2xl grid place-items-center -mx-1 -mt-1 mb-2" style={{ background: "var(--me-soft)" }}>
+              <ExerciseDemo key={ex.id} pattern={ex.pattern} />
+            </div>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="label">
