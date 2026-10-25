@@ -104,7 +104,7 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
     try {
       const r = await fetch("/api/estimate", { method: "POST", body: JSON.stringify({ text: t, image }) });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) setErr(j.error ?? "Hesaplayamadım");
+      if (!r.ok) setErr(r.status === 503 || String(j.error ?? "").includes("AI anahtarı") ? "Akıllı tahmin şu an kapalı. Kabaca seçebilirsin:" : j.error ?? "Hesaplayamadım");
       else setItems(j.items);
     } catch {
       setErr("Bağlantı koptu, tekrar dener misin?");
@@ -216,12 +216,14 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
 
       {err && (
         <div className="mt-3">
-          <p className="text-sm" style={{ color: "var(--warn)" }}>
+          <p className="text-sm" style={{ color: err.startsWith("Akıllı") ? "var(--ink-2)" : "var(--warn)" }}>
             {err}
           </p>
-          <p className="text-xs mt-2" style={{ color: "var(--ink-2)" }}>
-            Ya da kabaca seç:
-          </p>
+          {!err.startsWith("Akıllı") && (
+            <p className="text-xs mt-2" style={{ color: "var(--ink-2)" }}>
+              Ya da kabaca seç:
+            </p>
+          )}
           <div className="flex gap-2 mt-1 flex-wrap">
             {QUICK_SIZES.map((q) => (
               <button

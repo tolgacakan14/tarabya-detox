@@ -1,4 +1,6 @@
 "use client";
+import Icon from "./Icons";
+import { DayPill } from "./DayEnd";
 import QuickLog from "./QuickLog";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -118,7 +120,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
 
   return (
     <AppCtx.Provider value={{ s, act, reload, toast, celebrate, go }}>
-      <div data-user={user} className="min-h-dvh pb-28">
+      <div data-user={user} className="min-h-dvh pb-40">
         <div className="blobs" aria-hidden>
           <span />
           <span />
@@ -129,6 +131,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
             Selam <span className="text-grad">{s.profile.name}</span>
           </h1>
           <div className="flex items-center gap-2">
+            <DayPill />
             <span className="chip num font-semibold" title="Toplam puan">
               ⭐ {s.scores.me.total.toLocaleString("tr-TR")}
             </span>
@@ -165,17 +168,18 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
 
         {!["bugun", "yemek", "koc"].includes(tab) && (
           <button
-            className="fixed right-4 bottom-[92px] z-40 btn btn-me !rounded-full !px-5 !py-3 shadow-xl press"
+            className="fixed right-4 bottom-[96px] z-40 w-14 h-14 rounded-full grid place-items-center text-white grad-me shadow-xl press"
             onClick={() => setSheet(true)}
             aria-label="Yediğini kaydet"
           >
-            😋 Yedim
+            <Icon name="yemek" size={26} />
           </button>
         )}
         {sheet && (
           <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true" aria-label="Ne yedin?">
-            <button className="absolute inset-0 bg-black/30" aria-label="Kapat" onClick={() => setSheet(false)} />
-            <div className="relative w-full max-w-md mx-auto p-3 pb-[max(12px,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto">
+            <button className="absolute inset-0 bg-black/40 backdrop-blur-sm sheet-fade" aria-label="Kapat" onClick={() => setSheet(false)} />
+            <div className="relative w-full max-w-md mx-auto p-3 pb-[max(12px,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto sheet-up">
+              <span className="block w-10 h-1 rounded-full mx-auto mb-2" style={{ background: "rgba(255,255,255,.7)" }} />
               <QuickLog autoFocus onDone={() => setSheet(false)} />
             </div>
           </div>
@@ -197,12 +201,13 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
               className="min-h-[56px] py-2 flex flex-col items-center justify-center gap-0.5 press"
               aria-current={tab === t.id ? "page" : undefined}
             >
-              <span className={`text-xl leading-none transition-transform ${tab === t.id ? "scale-125" : "opacity-60"}`} aria-hidden>
-                {t.icon}
+              <span className="nav-ico" style={{ color: tab === t.id ? "var(--me)" : "var(--ink-3)", transform: tab === t.id ? "translateY(-2px)" : "none" }}>
+                <Icon name={t.id} size={23} />
               </span>
               <span className="text-[11px] font-semibold" style={{ color: tab === t.id ? "var(--me-ink)" : "var(--ink-3)" }}>
                 {t.label}
               </span>
+              <span className="w-1 h-1 rounded-full transition-opacity" style={{ background: "var(--me)", opacity: tab === t.id ? 1 : 0 }} />
             </button>
           ))}
         </nav>

@@ -151,8 +151,8 @@ function RoutineRunner({ id, onDone, onSkip }: { id: string; onDone: () => void;
         ))}
       </div>
       <div className="panel mt-4">
-        <div className="rounded-2xl grid place-items-center mb-2" style={{ background: "var(--me-soft)" }}>
-          <ExerciseDemo key={ex.id} pattern={ex.pattern} size={0.8} />
+        <div className="rounded-[28px] grid place-items-center mb-3 aspect-[4/3]" style={{ background: "radial-gradient(120% 90% at 30% 20%, #fff, var(--me-soft))" }}>
+          <ExerciseDemo key={ex.id} pattern={ex.pattern} size={1.5} />
         </div>
         <h3 className="display text-2xl font-bold">{ex.name}</h3>
         <p className="mt-1 text-lg font-semibold">
@@ -168,9 +168,26 @@ function RoutineRunner({ id, onDone, onSkip }: { id: string; onDone: () => void;
           ))}
         </ul>
         {step.seconds ? (
-          <button className="btn btn-me w-full mt-4 press !py-4 text-lg" onClick={() => (left === null ? setLeft(total) : next())}>
-            {left === null ? `▶ Başlat (${mmss(total)})` : `${mmss(left)} · geç`}
-          </button>
+          <>
+            {left !== null && (
+              <div className="relative mx-auto mt-4" style={{ width: 180, height: 180 }} role="timer" aria-live="polite">
+                <svg width="180" height="180" viewBox="0 0 180 180">
+                  <defs>
+                    <linearGradient id="rt-grad" x1="0" x2="1">
+                      <stop offset="0" stopColor="var(--me)" />
+                      <stop offset="1" stopColor="var(--me-2, var(--me))" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="90" cy="90" r="78" stroke="var(--line)" strokeWidth="10" fill="none" />
+                  <circle cx="90" cy="90" r="78" stroke="url(#rt-grad)" strokeWidth="10" fill="none" strokeLinecap="round" strokeDasharray={2 * Math.PI * 78} strokeDashoffset={2 * Math.PI * 78 * (1 - left / total)} transform="rotate(-90 90 90)" style={{ transition: "stroke-dashoffset 1s linear" }} />
+                </svg>
+                <p className="absolute inset-0 grid place-items-center display text-5xl font-bold num">{mmss(left)}</p>
+              </div>
+            )}
+            <button className={`btn ${left === null ? "btn-me" : "btn-ghost"} w-full mt-4 press !py-4 text-lg`} onClick={() => (left === null ? setLeft(total) : next())}>
+              {left === null ? `▶ Başlat (${mmss(total)})` : "Geç ›"}
+            </button>
+          </>
         ) : (
           <button className="btn btn-me w-full mt-4 press !py-4 text-lg" onClick={next}>
             Tamam ✓
@@ -309,8 +326,8 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
       {phase === "work" && (
         <div className="flex-1 overflow-y-auto p-4 pb-40">
           <div className="panel">
-            <div className="rounded-2xl grid place-items-center -mx-1 -mt-1 mb-2" style={{ background: "var(--me-soft)" }}>
-              <ExerciseDemo key={ex.id} pattern={ex.pattern} />
+            <div className="rounded-[28px] grid place-items-center -mx-1 -mt-1 mb-3 aspect-[4/3]" style={{ background: "radial-gradient(120% 90% at 30% 20%, #fff, var(--me-soft))" }}>
+              <ExerciseDemo key={ex.id} pattern={ex.pattern} size={1.6} />
             </div>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">

@@ -113,6 +113,7 @@ export default function Race() {
         <p className="label">2. seviyede ter bandı, 3. seviyede madalya, 5. seviyede taç açılır.</p>
       </Section>
 
+{me.weeks.length >= 3 && (
       <Section title="Son haftalar">
         <div className="flex items-end gap-3 h-40">
           {me.weeks.map((w, i) => {
@@ -141,6 +142,7 @@ export default function Race() {
           </ul>
         )}
       </Section>
+      )}
 
       <details className="panel">
         <summary className="display text-xl font-semibold cursor-pointer">Puan nasıl kazanılır?</summary>

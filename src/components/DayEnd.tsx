@@ -4,10 +4,17 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useApp, fmt } from "./ui";
 import { istHour } from "@/lib/dates";
+import Icon from "./Icons";
 
 const dayName = (d: string) => new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(d + "T12:00:00Z"));
 
-export function DayBar() {
+/** Header pill in the evening: "Günü bitir". */
+export function DayPill() {
+  return <DayBar pill />;
+}
+
+/** On Today: only the after-midnight question. */
+export function DayBar({ pill = false }: { pill?: boolean }) {
   const { s, act } = useApp();
   const [later, setLater] = useState(false);
   const [sheet, setSheet] = useState(false);
@@ -22,8 +29,9 @@ export function DayBar() {
   const summary = sheet && (
     createPortal(
       <div className="fixed inset-0 z-[70] flex items-end" role="dialog" aria-modal="true" aria-label="Günü bitir">
-        <button className="absolute inset-0 bg-black/40" aria-label="Kapat" onClick={() => setSheet(false)} />
-        <div className="relative w-full max-w-md mx-auto panel !rounded-b-none pb-[max(16px,env(safe-area-inset-bottom))]">
+        <button className="absolute inset-0 bg-black/40 backdrop-blur-sm sheet-fade" aria-label="Kapat" onClick={() => setSheet(false)} />
+        <div className="relative w-full max-w-md mx-auto panel !rounded-b-none pb-[max(16px,env(safe-area-inset-bottom))] sheet-up">
+          <span className="block w-10 h-1 rounded-full mx-auto mb-3" style={{ background: "var(--line)" }} />
           <p className="label">{dayName(s.today)}</p>
           <h2 className="display text-2xl font-bold">Günün özeti 🌙</h2>
           <div className="grid grid-cols-3 gap-2 mt-3">
@@ -67,7 +75,7 @@ export function DayBar() {
     )
   );
 
-  if (s.day.pending && !later) {
+  if (!pill && s.day.pending && !later) {
     return (
       <section className="panel !py-3" style={{ background: "linear-gradient(120deg,#1d1b3a,#3b2f6b)", color: "#fff" }}>
         {summary}
@@ -84,19 +92,12 @@ export function DayBar() {
       </section>
     );
   }
-  if (canEnd && (hour >= 20 || hour < 5)) {
+  if (pill && !s.day.pending && canEnd && (hour >= 20 || hour < 5)) {
     return (
       <>
         {summary}
-        <button className="panel !py-2.5 w-full flex items-center gap-3 text-left press" onClick={() => setSheet(true)}>
-          <span className="text-2xl" aria-hidden>
-            🌙
-          </span>
-          <span className="flex-1">
-            <span className="font-bold block">Günü bitir</span>
-            <span className="label">Yatmadan önce özetine bak, yeni güne geç.</span>
-          </span>
-          <span className="label">›</span>
+        <button className="chip press !min-h-[40px] font-semibold" onClick={() => setSheet(true)} aria-label="Günü bitir, özete bak">
+          <Icon name="moon" size={16} /> Günü bitir
         </button>
       </>
     );

@@ -21,8 +21,12 @@ function Roll({ text, className = "" }: { text: string; className?: string }) {
 }
 
 /** A scale ruler you swipe like a real dial: 0.1 kg per tick, snaps, haptic tick every 0.5 kg. */
-function Ruler({ value, onChange, min, max }: { value: number; onChange: (v: number) => void; min: number; max: number }) {
+function Ruler({ value, onChange, min, max, trend, yesterday }: { value: number; onChange: (v: number) => void; min: number; max: number; trend?: number; yesterday?: number }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pad, setPad] = useState(170);
+  useEffect(() => {
+    if (ref.current) setPad(ref.current.clientWidth / 2);
+  }, []);
   const STEP = 12; // px per 0.1 kg
   const n = Math.round((max - min) * 10);
   const last = useRef(value);
@@ -63,7 +67,14 @@ function Ruler({ value, onChange, min, max }: { value: number; onChange: (v: num
           if (e.key === "ArrowLeft") onChange(Math.max(min, round1(value - 0.1)));
         }}
       >
-        <div className="flex items-end h-16" style={{ paddingLeft: "50%", paddingRight: "50%", width: "max-content" }}>
+        <div className="relative flex items-end h-16" style={{ paddingLeft: pad - STEP / 2, paddingRight: pad - STEP / 2, width: "max-content" }}>
+          {/* ghost markers: the normal wobble around your trend, and yesterday's reading */}
+          {trend !== undefined && (
+            <span className="absolute bottom-0 h-full rounded-xl" style={{ left: pad - STEP / 2 + (trend - 0.3 - min) * 10 * STEP + STEP / 2, width: 6 * STEP, background: "var(--me-soft)" }} title="Trend ± 0,3 kg" />
+          )}
+          {yesterday !== undefined && (
+            <span className="absolute w-3 h-3 rounded-full border-2" style={{ bottom: 40, left: pad - STEP / 2 + (yesterday - min) * 10 * STEP + STEP / 2 - 6, borderColor: "var(--ink-2)" }} title="Dün" />
+          )}
           {Array.from({ length: n + 1 }, (_, i) => {
             const kgv = min + i / 10;
             const major = i % 10 === 0,
@@ -180,7 +191,7 @@ export function WeighIn() {
     const rate = s.engine.weeklyRate;
     const onTrack = rate !== null && rate * goalDir > 0.05;
     return (
-      <section className={`panel weigh-card relative overflow-hidden ${justSaved ? "weigh-pop" : ""}`}>
+      <section className={`panel weigh-card relative overflow-hidden cursor-pointer ${justSaved ? "weigh-pop" : ""}`} onClick={() => setEditing(true)} role="button" aria-label="Tartıyı düzelt">
         <div className="weigh-aurora" aria-hidden />
         {justSaved && <span className="weigh-ripple" aria-hidden />}
         <div className="relative flex items-start gap-3">
@@ -203,9 +214,7 @@ export function WeighIn() {
               </span>
             </div>
           </div>
-          <button className="chip press shrink-0" onClick={() => setEditing(true)}>
-            Düzelt
-          </button>
+          <span className="label shrink-0 mt-1">düzelt ›</span>
         </div>
         <div className="relative">
           <Ribbon pts={recent} />
@@ -271,12 +280,16 @@ export function WeighIn() {
         value={value}
         min={rMin}
         max={rMax}
+        trend={s.engine.trend.length ? s.engine.currentWeight : undefined}
+        yesterday={yesterday?.kg}
         onChange={(v) => {
           setTyped(null);
           setW(v);
         }}
       />
-      <p className="label text-center mt-1">← kaydır ya da sayıya dokunup yaz →</p>
+      <p className="label text-center mt-1">
+        {s.engine.trend.length ? "← kaydır · renkli bant normal oynama →" : "← kaydır ya da sayıya dokunup yaz →"}
+      </p>
 
       <div className="relative flex gap-2 mt-3 overflow-x-auto scroll-x">
         {[0, 1, 2, 3, 4, 5, 6].map((back) => {
@@ -328,7 +341,15 @@ function Chart({ series, goal, start, unit, band, projection }: { series: Series
   lo -= pad;
   hi += pad;
   const y = (v: number) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
-  const ticks = [lo + pad, (lo + hi) / 2, hi - pad];
+  const ticks =
+    unit === "%"
+      ? [0, 50, 100].filter((t) => t >= lo && t <= hi)
+      : (() => {
+          const step = hi - lo > 4 ? 1 : 0.5;
+          const out: number[] = [];
+          for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) out.push(Math.round(t * 10) / 10);
+          return out.length > 5 ? out.filter((_, i) => i % 2 === 0) : out;
+        })();
   const fmtv = (v: number) => (unit === "%" ? `%${Math.round(v)}` : kg(round1(v)));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Kilo grafiği">
@@ -423,7 +444,13 @@ export function WeightCharts({ compact = false }: { compact?: boolean }) {
   const lastT = s.engine.trend[s.engine.trend.length - 1];
   const projection =
     lastT && rate !== null && s.engine.trend.length >= 7 && ((p.goal === "gain" && rate > 0.02) || (p.goal === "lose" && rate < -0.02)) && range !== "7"
-      ? { date: addDays(lastT.date, 28), v: p.goal === "gain" ? Math.min(p.targetWeight, lastT.trend + rate * 4) : Math.max(p.targetWeight, lastT.trend + rate * 4) }
+      ? (() => {
+          // keep the look-ahead to ~25% of the chart so real data stays the hero
+          const first = mine[0]?.date ?? lastT.date;
+          const days = Math.max(5, Math.min(28, Math.round((Date.parse(lastT.date) - Date.parse(first)) / 864e5 / 3)));
+          const v = lastT.trend + (rate * days) / 7;
+          return { date: addDays(lastT.date, days), v: p.goal === "gain" ? Math.min(p.targetWeight, v) : Math.max(p.targetWeight, v) };
+        })()
       : undefined;
   const myEta = eta(p.goal, s.engine.currentWeight, p.targetWeight, s.engine.weeklyRate);
   const theirEta = eta(pp.goal, pp.current, pp.target, pp.weeklyRate);

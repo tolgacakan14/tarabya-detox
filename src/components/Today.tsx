@@ -3,7 +3,7 @@ import QuickLog from "./QuickLog";
 import { DayBar } from "./DayEnd";
 import { TogetherStreak } from "./CoupleMeter";
 import { usePhotoPicker } from "./PhotoAvatar";
-import { WeighIn, WeightCharts } from "./Weight";
+import { WeighIn } from "./Weight";
 // Home: deliberately simple. Where am I (kg + progress bar), today's three rings, and the one next thing to do.
 import { useApp, fmt, kg } from "./ui";
 import Avatar, { moodFor } from "./Avatar";
@@ -42,7 +42,6 @@ export default function Today() {
       </div>
       <div className="space-y-4">
         <NextUp />
-        <WeightCharts compact />
         <CycleMini />
         <PartnerStrip />
         {s.engine.insights.filter((i) => i.tone === "warn").map((i, k) => (
@@ -214,7 +213,7 @@ function NextUp() {
         </button>
       )}
 
-      {asks[0] && <AskFood foodId={asks[0].id} />}
+
 
       <button className="panel w-full text-left press flex items-center justify-between" onClick={() => go("yaris")}>
         <span>
