@@ -40,13 +40,13 @@ export default function Today() {
         <ProgressHero />
         <WeighIn />
         <QuickLog />
+        <NotifyCard />
         <RingsCard />
       </div>
       <div className="space-y-4">
         <NextUp />
         <CycleMini />
         <PartnerStrip />
-        <NotifyCard />
         {s.engine.insights.filter((i) => i.tone === "warn").map((i, k) => (
           <p key={k} className="panel !py-3 text-sm" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
             {i.text}

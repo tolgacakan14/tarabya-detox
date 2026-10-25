@@ -86,7 +86,7 @@ export function NotifyCard() {
       setHidden(false);
     }
   }, []);
-  if (hidden || !st || st.subscribed || s.habitDay < 2) return null;
+  if (hidden || !st || st.subscribed) return null;
   const later = () => {
     try {
       localStorage.setItem("notif-later", String(Date.now() + 7 * 864e5));
