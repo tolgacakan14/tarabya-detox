@@ -8,7 +8,7 @@ import { QUEST_IDS, SYMPTOMS } from "@/lib/cycle";
 import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
-import { LADDERS, PLANS, netKcal, type Effort } from "@/lib/training";
+import { BENCHMARKS, LADDERS, PLANS, netKcal, type Effort } from "@/lib/training";
 import { boundedNumber, validDate, validFood } from "@/lib/validate";
 
 
@@ -118,6 +118,23 @@ async function act(user: UserId, d: string, b: Body) {
       const own = await Promise.all((["food", "water", "workout", "todo", "weight"] as const).map((k) => list(user, k, addDays(d, -400), d)));
       if (!own.flat().some((r) => r.id === id)) throw new Error("Silinecek kayıt bulunamadı");
       await remove(user, id);
+      return;
+    }
+    case "aiFeedback": {
+      const ratio = num(b.ratio, 0.3, 3);
+      const { profile } = await getProfile(user);
+      const n = (profile.aiFactorN ?? 0) + 1;
+      const prev = profile.aiFactor ?? 1;
+      const f = Math.min(1.5, Math.max(0.8, prev + (Math.min(1.6, Math.max(0.6, ratio)) - prev) * (n < 5 ? 1 / n : 0.2)));
+      await saveProfile(user, { ...profile, aiFactor: Math.round(f * 100) / 100, aiFactorN: n });
+      return;
+    }
+    case "benchmark": {
+      const bm = BENCHMARKS.find((x) => x.id === b.id && x.users.includes(user));
+      if (!bm) throw new Error("Geçersiz test");
+      const v = Math.round(num(b.value, 0, bm.unit === "meters" ? 5000 : 1000));
+      const prev = (await list<Record<string, number>>(user, "bench", d, d))[0]?.data ?? {};
+      await setDaily(user, "bench", d, { ...prev, [bm.id]: v });
       return;
     }
     case "newDay": {

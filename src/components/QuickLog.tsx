@@ -42,6 +42,7 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
   const [photo, setPhoto] = useState<string | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
   const [mult, setMult] = useState(1);
+  const [factor, setFactor] = useState(1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const cam = useRef<HTMLInputElement>(null);
@@ -105,7 +106,10 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
       const r = await fetch("/api/estimate", { method: "POST", body: JSON.stringify({ text: t, image }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) setErr(r.status === 503 || String(j.error ?? "").includes("AI anahtarı") ? "Akıllı tahmin şu an kapalı. Kabaca seçebilirsin:" : j.error ?? "Hesaplayamadım");
-      else setItems(j.items);
+      else {
+        setItems(j.items);
+        setFactor(j.factor ?? 1);
+      }
     } catch {
       setErr("Bağlantı koptu, tekrar dener misin?");
     }
@@ -299,6 +303,9 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
                   { toast: `${fmt(total)} kcal kaydedildi 😋`, celebrate: true }
                 );
                 if (ok) {
+                  // teach the estimator how big your plates really are
+                  const raw = (items ?? []).reduce((x, i) => x + i.kcal, 0);
+                  if (raw > 0) fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "aiFeedback", ratio: (total / raw) * factor }) }).catch(() => {});
                   reset();
                   onDone?.();
                 }

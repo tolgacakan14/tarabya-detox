@@ -604,6 +604,7 @@ export async function buildState(user: UserId) {
       trend: pEng.trend.map((t) => ({ date: t.date, trend: t.trend })),
     },
     activity14: activityDays(raw, today),
+    bench: (await list<Record<string, number>>(user, "bench", "2020-01-01")).map((r) => ({ date: r.date, ...r.data })),
     eating14: eatingDays(raw, today),
     weightLog: raw.weights.slice(-60).map((w) => ({ id: w.id, date: w.date, kg: w.data.kg })),
     avatars: Object.fromEntries(

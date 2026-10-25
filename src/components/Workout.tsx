@@ -5,6 +5,7 @@ import { useApp, Section } from "./ui";
 import { EXERCISES, LADDERS, CARDIO } from "@/lib/training";
 import { IntervalPlayer, StrengthPlayer } from "./WorkoutPlayer";
 import EnergyPanel from "./Energy";
+import Benchmarks from "./Benchmarks";
 
 const DAY_SHORT: Record<string, string> = { pzt: "Pzt", sal: "Sal", car: "Çar", per: "Per", cum: "Cum", cmt: "Cmt", paz: "Paz" };
 const KIND_ICON: Record<string, string> = { strength: "💪", cardio: "🏃", circuit: "🔥", walk: "🌊", rest: "😴" };
@@ -229,6 +230,7 @@ export default function Workout() {
           </ul>
         </Section>
       )}
+      <Benchmarks />
       <Ladders />
       <MuscleVolume />
     </div>

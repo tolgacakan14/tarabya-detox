@@ -17,7 +17,10 @@ export interface Profile {
   // "manual" (default for both): the day ends when you say so, not at midnight.
   dayMode?: "manual" | "calendar";
   activeDate?: string;
-  intensity?: "standard" | "intense"; // undefined = intense (we both asked for the faster plan)
+  intensity?: "standard" | "intense";
+  // personal correction for AI plate estimates (O'Hara 2025: big plates are underestimated): EMA of saved ÷ suggested kcal
+  aiFactor?: number;
+  aiFactorN?: number; // undefined = intense (we both asked for the faster plan)
   kcalAdjust: number; // manual adjustment from coach, bounded by guardrails
   stepBaseline: number;
   equipment: string;
