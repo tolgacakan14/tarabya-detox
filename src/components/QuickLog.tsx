@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { useApp, fmt } from "./ui";
 import { QUICK_SIZES } from "@/lib/foods";
 
-type Item = { name: string; amount: string; kcal: number; protein: number; carbs: number; fat: number };
+type Item = { name: string; amount: string; kcal: number; protein: number; carbs: number; fat: number; low?: boolean; m?: number };
 const MULTS = [0.75, 1, 1.25, 1.5];
 
 function slotNow(): string {
@@ -80,14 +80,19 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
     setMult(1);
   }
 
-  const scaled = (items ?? []).map((i) => ({
-    ...i,
-    kcal: Math.round(i.kcal * mult),
-    protein: Math.round(i.protein * mult * 10) / 10,
-    carbs: Math.round(i.carbs * mult * 10) / 10,
-    fat: Math.round(i.fat * mult * 10) / 10,
-    amount: mult === 1 ? i.amount : `${i.amount} ×${String(mult).replace(".", ",")}`,
-  }));
+  const scaled = (items ?? []).map((i) => {
+    const k = mult * (i.m ?? 1);
+    return {
+      name: i.name,
+      low: i.low,
+      kcal: Math.round(i.kcal * k),
+      protein: Math.round(i.protein * k * 10) / 10,
+      carbs: Math.round(i.carbs * k * 10) / 10,
+      fat: Math.round(i.fat * k * 10) / 10,
+      amount: k === 1 ? i.amount : `${i.amount} ×${String(Math.round(k * 100) / 100).replace(".", ",")}`,
+    };
+  });
+  const setM = (idx: number, d: number) => setItems((items ?? []).map((x, k) => (k === idx ? { ...x, m: Math.min(3, Math.max(0.25, (x.m ?? 1) + d)) } : x)));
   const total = scaled.reduce((a, i) => a + i.kcal, 0);
   const prot = scaled.reduce((a, i) => a + i.protein, 0);
 
@@ -176,11 +181,11 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
               <p className="text-sm" style={{ color: "var(--ink-2)" }}>{Math.round(prot)} g protein</p>
             </div>
           </div>
-          <p className="text-sm font-semibold mt-3">Porsiyon tahmini doğru mu?</p>
+          <p className="text-sm font-semibold mt-3">Tabağın ne kadardı?</p>
           <div className="grid grid-cols-4 gap-1.5 mt-1.5">
             {MULTS.map((m) => (
               <button key={m} className="chip justify-center press" aria-pressed={mult === m} onClick={() => setMult(m)}>
-                {m === 1 ? "Doğru" : `×${String(m).replace(".", ",")}`}
+                {{ 0.75: "Küçük", 1: "Normal", 1.25: "Büyük", 1.5: "Dev" }[m]}
               </button>
             ))}
           </div>
@@ -189,9 +194,20 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
               <li key={i} className="flex items-center gap-2 text-sm">
                 <span className="flex-1 min-w-0">
                   <span className="font-semibold">{it.name}</span>
-                  {it.amount && <span className="label"> · {it.amount}</span>}
+                  {it.low && (
+                    <span className="ml-1 text-[11px] font-bold rounded-full px-1.5 py-0.5" style={{ background: "#fff1d6", color: "#8a5300" }}>
+                      kontrol et
+                    </span>
+                  )}
+                  {it.amount && <span className="label block"> {it.amount}</span>}
                 </span>
-                <span className="num">{it.kcal}</span>
+                <button className="chip !min-h-[36px] !px-2.5 press" onClick={() => setM(i, -0.25)} aria-label={`${it.name} azalt`}>
+                  −
+                </button>
+                <span className="num w-10 text-right">{it.kcal}</span>
+                <button className="chip !min-h-[36px] !px-2.5 press" onClick={() => setM(i, 0.25)} aria-label={`${it.name} artır`}>
+                  +
+                </button>
                 <button className="label underline" onClick={() => setItems(items.filter((_, k) => k !== i))} aria-label={`${it.name} çıkar`}>
                   ✕
                 </button>
@@ -208,7 +224,7 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
               onClick={async () => {
                 const meal = slotNow();
                 const ok = await act(
-                  { action: "addFoods", entries: scaled.map((x) => ({ ...x, meal, source: photo ? "photo" : "ai" })), planned: false },
+                  { action: "addFoods", entries: scaled.map(({ low: _low, ...x }) => ({ ...x, meal, source: photo ? "photo" : "ai" })), planned: false },
                   { toast: `${fmt(total)} kcal kaydedildi 😋`, celebrate: true }
                 );
                 if (ok) {

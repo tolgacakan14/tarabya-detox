@@ -443,30 +443,70 @@ export async function chat(user: UserId, message: string): Promise<{ reply: stri
 }
 
 /** Parses a free-text description of an unplanned meal into items with nutrition. */
+const FOOD_TABLE = FOODS.map((f) => `${f.id}|${f.name}|${f.portion}|${f.kcal}`).join("\n");
 const FOOD_SYSTEM =
-  "Sen bir Türk diyetisyenisin. Yemekleri kalemlere ayır ve her biri için gerçekçi kalori ve makro tahmini yap. Türkiye'deki tipik restoran/ev porsiyonlarını kullan. Büyük porsiyonları küçük tahmin etme (yapay zeka tahminleri büyük porsiyonları sistematik olarak düşük buluyor; bunu telafi et). Porsiyon belirtilmemişse orta porsiyon varsay. Yağda pişen yemeklerin yağını hesaba kat.";
+  "Sen bir Türk diyetisyenisin. Yemekleri kalemlere ayır ve her biri için gerçekçi kalori ve makro tahmini yap. Türkiye'deki tipik restoran/ev porsiyonlarını kullan. Büyük porsiyonları küçük tahmin etme (yapay zeka tahminleri büyük porsiyonları sistematik olarak düşük buluyor; bunu telafi et). Porsiyon belirtilmemişse orta porsiyon varsay. Yağda pişen yemeklerin yağını hesaba kat." +
+  " Bir kalem aşağıdaki tablodaki bir yemekle aynıysa foodId ve qty ver (makroları tablodan alacağım); değilse foodId boş, kendi tahminini yaz. Tablo (id|ad|porsiyon|kcal):\n" +
+  FOOD_TABLE;
 
+// Grounding: give the model our food table so it picks known items (database macros beat free guesses;
+// O'Hara 2025 recommends this for photo estimates) and the logs feed preference learning.
 const FOOD_TOOL = {
   name: "food_items",
   description: "Tahmin edilen yemek kalemleri",
-  input_schema: { type: "object", properties: { items: { type: "array", items: foodItemSchema } }, required: ["items"] },
+  input_schema: {
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
+        items: {
+          ...foodItemSchema,
+          properties: {
+            ...foodItemSchema.properties,
+            foodId: { type: "string", description: "Tablodaki birebir aynı yemeğin id'si; yoksa boş bırak" },
+            qty: { type: "number", description: "foodId varsa tablodaki porsiyonun kaç katı (0.5, 1, 1.5, 2…)" },
+            confidence: { type: "string", enum: ["high", "low"], description: "Yemeği ve porsiyonu ne kadar net görüyorsun" },
+          },
+        },
+      },
+    },
+    required: ["items"],
+  },
 };
 
-function cleanItems(out: Record<string, unknown>): FoodEntry[] {
-  return (((out as { items?: FoodEntry[] }).items ?? []) as FoodEntry[])
+type Estimated = FoodEntry & { foodId?: string; qty?: number; confidence?: string };
+function cleanItems(out: Record<string, unknown>): (FoodEntry & { low?: boolean })[] {
+  return (((out as { items?: Estimated[] }).items ?? []) as Estimated[])
     .slice(0, 12)
-    .map((i) => ({
+    .map((i) => {
+      const f = i.foodId ? FOODS.find((x) => x.id === i.foodId) : undefined;
+      const q = Number(i.qty);
+      if (f && Number.isFinite(q) && q >= 0.25 && q <= 6) {
+        // known food: use database macros × portion
+        return {
+          name: f.name,
+          amount: q === 1 ? f.portion : `${String(q).replace(".", ",")} × ${f.portion}`,
+          kcal: Math.round(f.kcal * q),
+          protein: Math.round(f.protein * q * 10) / 10,
+          carbs: Math.round(f.carbs * q * 10) / 10,
+          fat: Math.round(f.fat * q * 10) / 10,
+          low: i.confidence === "low",
+        };
+      }
+      return {
       name: String(i.name ?? "Yemek").slice(0, 80),
       amount: String(i.amount ?? "").slice(0, 60),
       kcal: Math.min(5000, Math.max(0, Math.round(Number(i.kcal) || 0))),
       protein: Math.min(400, Math.max(0, Math.round((Number(i.protein) || 0) * 10) / 10)),
       carbs: Math.min(800, Math.max(0, Math.round((Number(i.carbs) || 0) * 10) / 10)),
       fat: Math.min(400, Math.max(0, Math.round((Number(i.fat) || 0) * 10) / 10)),
-    }))
+      low: i.confidence === "low",
+      };
+    })
     .filter((i) => i.name.trim());
 }
 
-export async function estimateFood(text: string, image?: string): Promise<FoodEntry[]> {
+export async function estimateFood(text: string, image?: string): Promise<(FoodEntry & { low?: boolean })[]> {
   if (!hasAI()) throw new Error("AI anahtarı tanımlı değil");
   if (image) {
     const out = await extractVision(

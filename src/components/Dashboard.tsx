@@ -1,4 +1,5 @@
 "use client";
+import QuickLog from "./QuickLog";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppState } from "@/lib/state";
@@ -25,6 +26,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
   const router = useRouter();
   const [s, setS] = useState<AppState | null>(null);
   const [tab, setTab] = useState<TabId>("bugun");
+  const [sheet, setSheet] = useState(false);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [err, setErr] = useState("");
   const [loadErr, setLoadErr] = useState(false);
@@ -155,6 +157,23 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
           {tab === "ilerleme" && <Progress />}
         </main>
 
+        {!["bugun", "yemek", "koc"].includes(tab) && (
+          <button
+            className="fixed right-4 bottom-[92px] z-40 btn btn-me !rounded-full !px-5 !py-3 shadow-xl press"
+            onClick={() => setSheet(true)}
+            aria-label="Yediğini kaydet"
+          >
+            😋 Yedim
+          </button>
+        )}
+        {sheet && (
+          <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true" aria-label="Ne yedin?">
+            <button className="absolute inset-0 bg-black/30" aria-label="Kapat" onClick={() => setSheet(false)} />
+            <div className="relative w-full max-w-md mx-auto p-3 pb-[max(12px,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto">
+              <QuickLog autoFocus onDone={() => setSheet(false)} />
+            </div>
+          </div>
+        )}
         <nav
           className="fixed bottom-3 left-3 right-3 mx-auto max-w-[424px] grid grid-cols-6 rounded-3xl shadow-xl z-40"
           style={{ background: "var(--paper)", paddingBottom: "env(safe-area-inset-bottom)" }}
