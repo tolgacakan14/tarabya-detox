@@ -187,7 +187,7 @@ export async function extract(system: string, user: string, tool: ToolDef): Prom
 /* ---------------- vision (photo of a plate) ---------------- */
 
 const VISION_PREF: Record<string, string[]> = {
-  groq: ["meta-llama/llama-4-maverick-17b-128e-instruct", "meta-llama/llama-4-scout-17b-16e-instruct"],
+  groq: ["qwen/qwen3.8-27b", "meta-models/muse-spark-open", "meta-llama/llama-4-maverick-17b-128e-instruct", "meta-llama/llama-4-scout-17b-16e-instruct"],
   gemini: ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
 };
 const visionChosen: Record<string, string> = {};
@@ -201,7 +201,7 @@ async function pickVisionModel(p: Provider): Promise<string | null> {
     if (r.ok) {
       const ids = (((await r.json()) as { data?: { id: string }[] }).data ?? []).map((m) => m.id.replace(/^models\//, ""));
       console.error("vision models available", ids.join(","));
-      const hit = VISION_PREF[p.name].find((m) => ids.includes(m)) ?? ids.find((m) => (p.name === "groq" ? /llama-4|vision|scout|maverick|-vl/i.test(m) : /flash/.test(m) && !/image|tts|audio|live|embed/.test(m)));
+      const hit = VISION_PREF[p.name].find((m) => ids.includes(m)) ?? ids.find((m) => (p.name === "groq" ? /qwen3\.\d+-\d+b|llama-4|vision|scout|maverick|-vl/i.test(m) : /flash/.test(m) && !/image|tts|audio|live|embed/.test(m)));
       if (hit) return (visionChosen[p.name] = hit);
     }
   } catch {
