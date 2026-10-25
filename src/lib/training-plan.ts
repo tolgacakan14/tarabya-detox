@@ -63,7 +63,7 @@ export function trainingToday(user: UserId, programWeek: number, today: string, 
         tests: nextPlanned.tests ?? [],
         exercises: nextPlanned.prescriptions.map((rx) => {
           const mem = last[rx.ladder];
-          const sug = mem ? suggestNext(rx.ladder, mem.step, mem.sets, mem.effort) : null;
+          const sug = mem ? suggestNext(rx.ladder, mem.step, mem.sets, mem.effort, rx.sets) : null;
           const step = sug ? sug.step : rx.startStep;
           const ex = EXERCISES[LADDERS[rx.ladder].steps[step]];
           const base = sug?.targets ?? [];

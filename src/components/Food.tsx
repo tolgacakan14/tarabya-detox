@@ -50,7 +50,7 @@ export default function Food() {
                     {m.items.map((it) => (
                       <li key={it.foodId} className="flex items-center gap-2">
                         <span className="flex-1">
-                          {it.qty !== 1 && <b className="num">{it.qty}× </b>}
+                          {it.qty !== 1 && <b className="num">{String(it.qty).replace(".", ",")}× </b>}
                           {it.name}
                           <span className="label"> ({it.portion})</span>
                         </span>

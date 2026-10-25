@@ -1093,13 +1093,14 @@ export interface NextRx {
  * lastSets: what was done in each working set (reps or seconds, per side if perSide).
  * effort: the user's tap after the last set (optional).
  */
-export function suggestNext(ladderId: string, step: number, lastSets: number[], effort?: Effort): NextRx {
+export function suggestNext(ladderId: string, step: number, lastSets: number[], effort?: Effort, prescribed?: number): NextRx {
   const ladder = LADDERS[ladderId];
   const s = Math.max(0, Math.min(ladder.steps.length - 1, step));
   const ex = EXERCISES[ladder.steps[s]];
   const done: number[] = [];
   for (const v of lastSets) if (v > 0) done.push(v);
-  const sets = Math.max(1, lastSets.length);
+  // a light day (fewer sets) must not count as "all sets at the top"
+  const sets = Math.max(1, prescribed ?? lastSets.length);
   const inc = ex.unit === "seconds" ? 5 : 1;
   const fill = (n: number): number[] => {
     const out: number[] = [];

@@ -17,11 +17,21 @@ export function WeighIn() {
   const [typed, setTyped] = useState<string | null>(null);
 
   const open = !s.weighedToday || editing;
-  const value = typed !== null ? Number(typed.replace(",", ".")) : w;
-  const valid = Number.isFinite(value) && value >= 30 && value <= 200;
+  const parsed = typed !== null ? Number(typed.replace(",", ".")) : w;
+  const value = Number.isFinite(parsed) ? parsed : w;
+  const valid = Number.isFinite(parsed) && parsed >= 30 && parsed <= 200;
+  const pick = (d: string) => {
+    setDate(d);
+    setTyped(null);
+    const known = log.find((x) => x.date === d)?.kg;
+    if (known) setW(known);
+  };
 
   async function save() {
     if (!valid) return;
+    // one typo (e.g. 155 instead of 55) would reshape the whole plan
+    const ref = s.engine.trend.length ? s.engine.currentWeight : s.profile.startWeight;
+    if (Math.abs(value - ref) / ref > 0.05 && !confirm(`${kg(value)} kg, trendinden (${kg(ref)} kg) çok farklı. Doğru mu?`)) return;
     const ok = await act(
       { action: "weight", kg: round1(value), ...(date !== s.today ? { date } : {}) },
       { toast: date === s.today ? `${kg(value)} kg kaydedildi` : "Geçmiş tartı kaydedildi", points: date === s.today && !s.weighedToday ? 10 : undefined }
@@ -99,11 +109,14 @@ export function WeighIn() {
         </button>
       </div>
       <div className="flex gap-2 mt-2 overflow-x-auto scroll-x">
-        {[0, 1, 2].map((back) => {
+        {[0, 1, 2, 3, 4, 5, 6].map((back) => {
           const d = addDays(s.today, -back);
+          const day = new Intl.DateTimeFormat("tr-TR", { weekday: "long", timeZone: "UTC" }).format(new Date(d + "T12:00:00Z"));
+          const has = log.some((x) => x.date === d);
           return (
-            <button key={d} className="chip press shrink-0" aria-pressed={date === d} onClick={() => setDate(d)}>
-              {back === 0 ? "Bugün" : back === 1 ? "Dün" : "Önceki gün"}
+            <button key={d} className="chip press shrink-0" aria-pressed={date === d} onClick={() => pick(d)}>
+              {back === 0 ? "Bugün" : back === 1 ? "Dün" : day}
+              {has ? " ✓" : ""}
             </button>
           );
         })}
@@ -252,7 +265,7 @@ export function WeightCharts({ compact = false }: { compact?: boolean }) {
         <h2 className="display text-xl font-bold">Kilo grafiği</h2>
         <div className="flex gap-1">
           {RANGES.map((r) => (
-            <button key={r.id} className="chip !min-h-[34px] !px-2.5 !text-[12px] press" aria-pressed={range === r.id} onClick={() => setRange(r.id)}>
+            <button key={r.id} className="chip !min-h-[40px] !px-2.5 !text-[12px] press" aria-pressed={range === r.id} onClick={() => setRange(r.id)}>
               {r.label}
             </button>
           ))}
@@ -343,14 +356,18 @@ export function WeightHistory() {
                   {kg(d)}
                 </span>
               )}
-              <button className="label underline" onClick={() => act({ action: "delete", id: r.id }, { toast: "Silindi" })} aria-label={`${r.date} tartısını sil`}>
+              <button
+                className="chip press !text-[13px]"
+                onClick={() => confirm(`${r.date.slice(8)}.${r.date.slice(5, 7)} tartısı silinsin mi?`) && act({ action: "delete", id: r.id }, { toast: "Silindi" })}
+                aria-label={`${r.date} tartısını sil`}
+              >
                 Sil
               </button>
             </li>
           );
         })}
       </ul>
-      <p className="label mt-2">Geçmiş bir günü düzeltmek için ana sayfadaki tartı kartında Dün / Önceki gün seç.</p>
+      <p className="label mt-2">Geçmiş bir günü eklemek ya da düzeltmek için ana sayfadaki tartı kartında Düzelt'e dokunup günü seç (son 7 gün).</p>
     </details>
   );
 }

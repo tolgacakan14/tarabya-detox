@@ -144,6 +144,7 @@ export function buildMenu(opts: {
   seed: number;
   slotSeeds?: Record<number, number>;
   recent?: Record<string, number>; // times eaten in the last 7 days
+  min?: number; // hard lower bound (the loser's safety floor)
 }): DayMenu {
   const { goal, prefs } = opts;
   const known = Object.values(prefs).filter((v) => v > 0).length;
@@ -288,12 +289,13 @@ export function buildMenu(opts: {
     const its = all().filter((x) => scalableRole(x.i.foodId));
     if (!its.length) break;
     let t;
-    if (day < opts.kcal * 0.92) {
+    const lowB = Math.max(opts.min ?? 0, opts.kcal * 0.97);
+    if (day < lowB) {
       // grow the most energy-dense item that still has room (fewest steps to the target)
       t = its.filter((x) => x.i.qty < 3).sort((a, b) => b.f.kcal - a.f.kcal)[0];
       if (!t) break;
       t.i.qty += 0.5;
-    } else if (day > opts.kcal * 1.08) {
+    } else if (day > opts.kcal * 1.07 && day - 60 > (opts.min ?? 0)) {
       // shrink, but keep protein foods where they are
       t = its.filter((x) => x.i.qty > 0.5 && META[x.i.foodId].role !== "protein").sort((a, b) => b.i.kcal - a.i.kcal)[0] ?? its.filter((x) => x.i.qty > 0.5).sort((a, b) => b.i.kcal - a.i.kcal)[0];
       if (!t) break;
@@ -302,6 +304,41 @@ export function buildMenu(opts: {
     t.i.kcal = Math.round(t.f.kcal * t.i.qty);
     t.i.protein = Math.round(t.f.protein * t.i.qty);
     recalc(t.m);
+  }
+  // the loser must not be served more than planned: drop extras (snack/drink/side) while over budget
+  if (goal === "lose") {
+    for (let guard = 0; guard < 6; guard++) {
+      const day = meals.reduce((x, m) => x + m.kcal, 0);
+      if (day <= opts.kcal * 1.07) break;
+      const extras = all().filter((x) => ["snack", "drink", "side", "soup"].includes(META[x.i.foodId]?.role) && x.m.items.length > 1 && day - x.i.kcal >= (opts.min ?? 0));
+      const t = extras.sort((p1, p2) => Math.abs(day - p1.i.kcal - opts.kcal) - Math.abs(day - p2.i.kcal - opts.kcal))[0];
+      if (!t) break;
+      t.m.items = t.m.items.filter((i) => i !== t.i);
+      recalc(t.m);
+    }
+  }
+  // still short (e.g. under Eylül's safety floor)? add the smallest liked snack/drink that closes the gap
+  let dayK = meals.reduce((a, m) => a + m.kcal, 0);
+  if (dayK < Math.max(opts.min ?? 0, opts.kcal * 0.97)) {
+    const gap = Math.max(opts.min ?? 0, opts.kcal) - dayK;
+    const snackMeal = meals.find((m) => m.slot === "ara öğün") ?? meals[meals.length - 1];
+    const cands = pool.filter((f) => ["snack", "drink", "side"].includes(META[f.id].role) && !snackMeal.items.some((i) => i.foodId === f.id));
+    // the option (food × 0.5/1/1.5) that lands closest above the gap
+    let bestF: Food | null = null,
+      bestQ = 1,
+      bestD = Infinity;
+    for (const c of cands)
+      for (const q of [0.5, 1, 1.5]) {
+        const k = c.kcal * q;
+        const d = k >= gap ? k - gap : (gap - k) * 3;
+        if (d < bestD) [bestF, bestQ, bestD] = [c, q, d];
+      }
+    const f = bestF;
+    if (f) {
+      snackMeal.items.push({ foodId: f.id, qty: bestQ, name: f.name, portion: f.portion, kcal: Math.round(f.kcal * bestQ), protein: Math.round(f.protein * bestQ), isNew: (prefs[f.id] ?? 0) === 0 });
+      recalc(snackMeal);
+      dayK += Math.round(f.kcal * bestQ);
+    }
   }
   proteinNow = meals.reduce((a, m) => a + m.protein, 0);
 

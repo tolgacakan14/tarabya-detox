@@ -19,7 +19,15 @@ const num = boundedNumber;
 export async function POST(req: Request) {
   try {
     if (Number(req.headers.get("content-length") ?? 0) > 450_000) throw new Error("İstek çok büyük");
-    const body = (await req.json().catch(() => null)) as Body | null;
+    const rawText = await req.text();
+    if (rawText.length > 450_000) throw new Error("İstek çok büyük");
+    const body = (() => {
+      try {
+        return JSON.parse(rawText);
+      } catch {
+        return null;
+      }
+    })() as Body | null;
     if (!body || typeof body !== "object" || typeof body.action !== "string") throw new Error("Geçersiz istek");
     if (body.action === "login") {
       if (!isUser(body.user)) return NextResponse.json({ error: "Profil seç" }, { status: 400 });
@@ -50,19 +58,20 @@ async function cleanV2(user: UserId, v: unknown, minutes?: number): Promise<Part
   const o = (v ?? {}) as Record<string, unknown>;
   const tpl = PLANS[user].templates.find((t) => t.id === o.template);
   if (!tpl) throw new Error("Geçersiz antrenman");
+  const allowed = new Set(tpl.slots.map((sl) => sl.ladder));
   const items = (Array.isArray(o.items) ? o.items : []).slice(0, 12).flatMap((x) => {
     const it = x as Record<string, unknown>;
     const ladder = LADDERS[String(it.ladder)];
-    if (!ladder) return [];
+    if (!ladder || !allowed.has(ladder.id)) return [];
     const step = Math.round(num(it.step, 0, ladder.steps.length - 1));
     const sets = (Array.isArray(it.sets) ? it.sets : []).slice(0, 8).map((s) => Math.round(num(s || 0, 0, 600)));
     const effort = ["easy", "right", "hard"].includes(String(it.effort)) ? (it.effort as Effort) : undefined;
     return [{ ladder: ladder.id, step, sets, effort }];
   });
-  if (!items.length) throw new Error("En az bir set kaydet");
+  if (!items.some((i) => i.sets.some((x) => x > 0))) throw new Error("En az bir set kaydet");
   const weights = await list<{ kg: number }>(user, "weight", addDays(today(), -60), today());
   const kg = weights[weights.length - 1]?.data.kg ?? (await getProfile(user)).profile.startWeight;
-  const mins = minutes ? num(minutes, 1, 180) : 30;
+  const mins = minutes ? Math.min(180, Math.max(1, Number(minutes) || 30)) : 30;
   return {
     v2: { template: tpl.id, week: Math.round(num(o.week ?? 1, 1, 12)), items, prs: Math.round(num(o.prs ?? 0, 0, 30)), readiness: o.readiness === "light" ? "light" : "normal" },
     session: tpl.id,
@@ -110,6 +119,8 @@ async function act(user: UserId, d: string, b: Body) {
       // a small square JPEG cropped on the phone; served from /api/avatar/[user]
       const img = typeof b.image === "string" ? b.image : "";
       if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 400_000) throw new Error("Fotoğraf okunamadı");
+      // must really be a JPEG (magic bytes), not something labelled as one
+      if (!Buffer.from(img.split(",")[1].slice(0, 8), "base64").subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) throw new Error("Fotoğraf okunamadı");
       await setDaily(user, "avatar", "0000-00-00", { img, v: Date.now() });
       return;
     }
@@ -232,7 +243,7 @@ async function act(user: UserId, d: string, b: Body) {
       if (b.flow !== undefined) next.flow = b.flow === null ? undefined : Math.round(num(b.flow, 1, 3));
       if (b.energy !== undefined) next.energy = b.energy === null ? undefined : Math.round(num(b.energy, 1, 5));
       if (Array.isArray(b.quests)) next.quests = (b.quests as unknown[]).map(String).filter((x) => QUEST_IDS.includes(x)).slice(0, 6);
-      if (b.mood !== undefined) next.mood = b.mood === null ? undefined : String(b.mood).slice(0, 8);
+      if (b.mood !== undefined) next.mood = b.mood === null || !["calm", "happy", "sad", "angry", "anxious", "tired"].includes(String(b.mood)) ? undefined : String(b.mood);
       if (Array.isArray(b.symptoms)) next.symptoms = (b.symptoms as unknown[]).map(String).filter((x) => SYMPTOMS.some((s) => s.id === x)).slice(0, 10);
       await setDaily(user, "cycle", date, next);
       return;

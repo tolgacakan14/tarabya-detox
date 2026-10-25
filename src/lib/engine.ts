@@ -230,7 +230,7 @@ export function runEngine(
   kcal += p.kcalAdjust;
   kcal = Math.max(floor, kcal);
   if (p.goal === "gain") kcal = Math.max(kcal, Math.round(tdee));
-  kcal = Math.round(kcal / 10) * 10;
+  kcal = Math.max(Math.ceil(floor / 10) * 10, Math.round(kcal / 10) * 10);
 
   const protein = Math.round(((intense ? Math.max(p.proteinPerKg, 2.0) : p.proteinPerKg) * currentWeight) / 5) * 5;
   const fat =

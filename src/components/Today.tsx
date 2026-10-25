@@ -179,7 +179,7 @@ function NextUp() {
             <p className="display text-xl font-bold capitalize">Sıradaki: {next.m.slot}</p>
             <span className="label num">{next.m.kcal} kcal</span>
           </div>
-          <p className="mt-1 text-lg">{next.m.items.map((i) => (i.qty !== 1 ? `${i.qty}× ` : "") + i.name).join(" + ")}</p>
+          <p className="mt-1 text-lg">{next.m.items.map((i) => (i.qty !== 1 ? `${String(i.qty).replace(".", ",")}× ` : "") + i.name).join(" + ")}</p>
           <div className="flex gap-2 mt-3">
             <button
               className="btn btn-me flex-1 press"

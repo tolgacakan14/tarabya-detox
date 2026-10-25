@@ -51,7 +51,10 @@ function useWakeLock(on: boolean) {
     };
   }, [on]);
 }
-const mmss = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, Math.round(s)) % 60).padStart(2, "0")}`;
+const mmss = (s: number) => {
+  const t = Math.max(0, Math.ceil(s - 0.05));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
 
 function Sheet({ children, onClose, label }: { children: React.ReactNode; onClose?: () => void; label: string }) {
   return createPortal(
@@ -200,6 +203,7 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
   const [idx, setIdx] = useState(0);
   const [rest, setRest] = useState<{ sec: number; next: string; id: number } | null>(null);
   const [startedAt] = useState(() => Date.now());
+  const [doneAt, setDoneAt] = useState<number | null>(null);
   const [openHow, setOpenHow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -221,7 +225,10 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
   const update = (patch: Partial<Row>) => setRows(rows.map((r, k) => (k === idx ? { ...r, ...patch } : r)));
   const nextName = idx < rows.length - 1 ? EXERCISES[LADDERS[rows[idx + 1].ladder].steps[rows[idx + 1].step]].name : "Soğuma";
 
-  const minutes = Math.max(5, Math.round((Date.now() - startedAt) / 60000));
+  const minutes = Math.min(180, Math.max(5, Math.round(((doneAt ?? Date.now()) - startedAt) / 60000)));
+  useEffect(() => {
+    if (phase === "done" && doneAt === null) setDoneAt(Date.now());
+  }, [phase, doneAt]);
   const kg = s.engine.currentWeight;
   const items = rows.map((r) => ({ ladder: r.ladder, step: r.step, sets: r.done.slice(0, mode === "light" ? Math.max(1, r.targets.length - 1) : r.targets.length).map((x) => x ?? 0), effort: r.effort }));
   const prs = useMemo(
@@ -260,7 +267,7 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
       {/* top bar */}
       <div className="sticky top-0 z-10 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 border-b" style={{ background: "var(--paper, #fff)", borderColor: "var(--line)" }}>
         <div className="flex items-center gap-3">
-          <button className="w-10 h-10 rounded-full grid place-items-center press" style={{ background: "var(--line)" }} onClick={onClose} aria-label="Kapat">
+          <button className="w-11 h-11 rounded-full grid place-items-center press" style={{ background: "var(--line)" }} onClick={onClose} aria-label="Kapat">
             ✕
           </button>
           <div className="flex-1 min-w-0">
@@ -349,10 +356,11 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
                 onClick={() => {
                   const ns = row.step - 1;
                   const nx = EXERCISES[LADDERS[row.ladder].steps[ns]];
+                  if (row.done.some((x) => x !== null) && !confirm("Bu harekette işaretli setler sıfırlansın mı?")) return;
                   update({ step: ns, targets: row.targets.map(() => Math.round((nx.min + nx.max) / 2)), done: row.done.map(() => null) });
                 }}
               >
-                ‹ Kolay
+                ‹ Daha kolay
               </button>
               <div className="flex-1 flex justify-center gap-1">
                 {LADDERS[row.ladder].steps.map((_, k) => (
@@ -365,10 +373,11 @@ export function StrengthPlayer({ session, onClose }: { session: Session; onClose
                 onClick={() => {
                   const ns = row.step + 1;
                   const nx = EXERCISES[LADDERS[row.ladder].steps[ns]];
+                  if (row.done.some((x) => x !== null) && !confirm("Bu harekette işaretli setler sıfırlansın mı?")) return;
                   update({ step: ns, targets: row.targets.map(() => nx.min), done: row.done.map(() => null) });
                 }}
               >
-                Zor ›
+                Daha zor ›
               </button>
             </div>
           </div>
@@ -560,7 +569,11 @@ function Readiness({ female, sleep, onStart, onSwap, session }: { female: boolea
           {r.message}
         </p>
       </div>
-      {r.mode === "rest" || r.mode === "swap_walk" ? (
+      {r.mode === "rest" ? (
+        <button className="btn btn-me w-full mt-4 press !py-4" onClick={onSwap}>
+          Tamam, bugün dinleneceğim
+        </button>
+      ) : r.mode === "swap_walk" ? (
         <div className="grid grid-cols-2 gap-2 mt-4">
           <button className="btn btn-ghost press" onClick={() => onStart("light")}>
             Yine de hafif yap
@@ -603,6 +616,7 @@ export function IntervalPlayer({ cardio, circuit, onClose }: { cardio?: CardioSe
   const [now, setNow] = useState(Date.now());
   const [together, setTogether] = useState(false);
   const [done, setDone] = useState(false);
+  const [saving, setSaving] = useState(false);
   useWakeLock(segEnd !== null && !done);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
@@ -638,7 +652,7 @@ export function IntervalPlayer({ cardio, circuit, onClose }: { cardio?: CardioSe
   return (
     <Sheet label={title}>
       <div className="px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 flex items-center gap-3">
-        <button className="w-10 h-10 rounded-full grid place-items-center press" style={{ background: "var(--line)" }} onClick={onClose} aria-label="Kapat">
+        <button className="w-11 h-11 rounded-full grid place-items-center press" style={{ background: "var(--line)" }} onClick={onClose} aria-label="Kapat">
           ✕
         </button>
         <p className="font-bold flex-1 truncate">{title}</p>
@@ -693,8 +707,14 @@ export function IntervalPlayer({ cardio, circuit, onClose }: { cardio?: CardioSe
             </button>
             <button
               className="btn btn-me press"
+              disabled={saving}
               onClick={async () => {
-                if (await act({ action: "workout", log: { type: circuit ? "run" : isRun ? "run" : "walk", minutes, withPartner: together } }, { toast: "Kaydedildi 🌊", points: 20, celebrate: true })) onClose();
+                setSaving(true);
+                const ok = circuit
+                  ? await act({ action: "customWorkout", activities: [{ name: circuit.title, category: "cardio", kind: "hiit", minutes, intensity: "moderate" }], desc: circuit.title, withPartner: together }, { toast: "Kaydedildi 🔥", points: 20, celebrate: true })
+                  : await act({ action: "workout", log: { type: isRun ? "run" : "walk", minutes, withPartner: together } }, { toast: "Kaydedildi 🌊", points: 20, celebrate: true });
+                setSaving(false);
+                if (ok) onClose();
               }}
             >
               Kaydet

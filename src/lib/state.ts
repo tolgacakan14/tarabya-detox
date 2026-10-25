@@ -226,7 +226,9 @@ function scoreDay(raw: Raw, eng: EngineResult, date: string, partnerWalks: Set<s
   if (training) add("workout", "Antrenman", strength, 40, strength ? 40 : mini ? 15 : 0, mini && !strength ? "Mini antrenman 15 puan" : undefined);
   else add("cardio", "Sahil yürüyüşü / hafif kardiyo", !!cardio || strength, 20);
   add("sleep", "7+ saat uyku", (sleep ?? 0) >= 7, 10);
-  if (p.sex === "f" && p.cycleTracking !== false && raw.cycle.length) {
+  // only from the day she started tracking, so past weeks keep their completion
+  const firstCycle = raw.cycle[0]?.date;
+  if (p.sex === "f" && p.cycleTracking !== false && firstCycle && date >= firstCycle) {
     const cd = raw.cycle.find((c) => c.date === date)?.data as { energy?: number } | undefined;
     add("cycle", "Döngü check-in", !!cd?.energy, 10, undefined, "Bugün nasılsın? emojisine dokun");
   }
@@ -494,7 +496,7 @@ export async function buildState(user: UserId) {
     habitDay: eng.dayIndex + 1,
     scores: {
       me: { total: me.total, week: myWeek?.points ?? 0, completion: myWeek?.completion ?? 0, streak: me.streak, level: levelFor(me.total), today: todayScore.points, weeks: me.weeks.slice(-8) },
-      partner: { name: praw.profile.name, total: them.total, week: theirWeek?.points ?? 0, completion: theirWeek?.completion ?? 0, streak: them.streak, level: levelFor(them.total), today: partnerToday.points, weeks: them.weeks.slice(-8), todayTasks: partnerToday.tasks.map((t) => ({ id: t.id.startsWith("todo:") ? "todo" : t.id, done: t.done })) },
+      partner: { name: praw.profile.name, total: them.total, week: theirWeek?.points ?? 0, completion: theirWeek?.completion ?? 0, streak: them.streak, level: levelFor(them.total), today: partnerToday.points, weeks: them.weeks.slice(-8), todayTasks: partnerToday.tasks.filter((t) => t.id !== "cycle").map((t) => ({ id: t.id.startsWith("todo:") ? "todo" : t.id, done: t.done })) },
       couple: (((myWeek?.completion ?? 0) + (theirWeek?.completion ?? 0)) / 2),
       weeksWon,
       together: coupleStreak(raw, praw, today),

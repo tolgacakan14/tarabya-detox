@@ -21,6 +21,6 @@ export async function POST(req: Request) {
   } catch (e) {
     const msg = (e as Error).message;
     console.error("estimate", image ? "image" : "text", msg);
-    return NextResponse.json({ error: msg.startsWith("Ücretsiz kota") || msg.startsWith("AI anahtarı") ? msg : "Şu an hesaplayamadım, birazdan tekrar dene." }, { status: 500 });
+    return NextResponse.json({ error: msg.startsWith("Ücretsiz kota") || msg.startsWith("AI anahtarı") ? msg : "Şu an hesaplayamadım, birazdan tekrar dene." }, { status: msg.startsWith("AI anahtarı") ? 503 : 500 });
   }
 }

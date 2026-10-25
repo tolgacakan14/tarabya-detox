@@ -11,6 +11,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ user: string }>
   const b64 = rec.data.img.split(",")[1] ?? "";
   const versioned = new URL(req.url).searchParams.has("v");
   return new Response(Buffer.from(b64, "base64"), {
-    headers: { "Content-Type": "image/jpeg", "Cache-Control": versioned ? "public, max-age=31536000, immutable" : "no-cache" },
+    headers: { "Content-Type": "image/jpeg", "X-Content-Type-Options": "nosniff", "Cache-Control": versioned ? "public, max-age=31536000, immutable" : "no-cache" },
   });
 }

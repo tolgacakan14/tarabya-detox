@@ -84,7 +84,7 @@ export function CycleMini() {
           {ENERGY.map((e, i) => (
             <button
               key={i}
-              className={`w-10 h-10 rounded-full grid place-items-center text-xl press transition-transform ${log.energy === i + 1 ? "scale-125" : "opacity-70"}`}
+              className={`w-11 h-11 rounded-full grid place-items-center text-xl press transition-transform ${log.energy === i + 1 ? "scale-125" : "opacity-70"}`}
               style={log.energy === i + 1 ? { background: PHASES[phase].color + "33" } : undefined}
               aria-pressed={log.energy === i + 1}
               aria-label={`Enerji ${i + 1}/5`}
