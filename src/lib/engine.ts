@@ -102,7 +102,7 @@ export function runEngine(
   intakeByDate: Record<string, number>,
   stepsByDate: Record<string, number>,
   redFlagsRecent: number,
-  opts: { waistTooFast?: boolean } = {}
+  opts: { waistTooFast?: boolean; cycleKcalBonus?: number; cycleWaterWeight?: boolean } = {}
 ): EngineResult {
   const dayIndex = Math.max(0, daysBetween(p.startDate, today));
   const week = Math.floor(dayIndex / 7) + 1;
@@ -201,6 +201,12 @@ export function runEngine(
       insights.push({ tone: "good", text: `Haftada ${Math.abs(weeklyRate).toFixed(2)} kg veriyorsun. Sağlıklı ve sürdürülebilir bir hız.` });
     }
   }
+
+  if (opts.cycleKcalBonus) {
+    kcal += opts.cycleKcalBonus;
+    insights.push({ tone: "info", text: `Adet öncesi dönemdesin: iştah ve metabolizma biraz artıyor, hedefine +${opts.cycleKcalBonus} kcal döngü payı ekledim.` });
+  }
+  if (opts.cycleWaterWeight) insights.push({ tone: "info", text: "Bu günlerde tartıdaki artış büyük ihtimalle su tutulumu, yağ değil. Trende bak." });
 
   kcal += p.kcalAdjust;
   kcal = Math.max(floor, kcal);

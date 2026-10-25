@@ -6,6 +6,7 @@ import { addDays, daysBetween, today as todayFn, weekStart } from "./dates";
 import { SESSIONS, phaseFor, cardioFor, MINI, EXERCISES } from "./programs";
 import { FOODS } from "./foods";
 import { analyzeBody, type Measure } from "./body";
+import { analyzeCycle, type CycleDay } from "./cycle";
 
 export interface WorkoutLog {
   type: "strength" | "mini" | "walk" | "run";
@@ -51,13 +52,14 @@ interface Raw {
   todos: Rec<Todo>[];
   measures: Rec<Record<string, number>>[];
   flags: Rec<{ type: string }>[];
+  cycle: Rec<Omit<CycleDay, "date">>[];
   reactionsSent: number; // count today
 }
 
 async function loadRaw(user: UserId): Promise<Raw> {
   const { profile } = await getProfile(user);
   const from = addDays(profile.startDate, -14);
-  const [foods, weights, steps, sleep, water, workouts, todos, measures, flags] = await Promise.all([
+  const [foods, weights, steps, sleep, water, workouts, todos, measures, flags, cycle] = await Promise.all([
     list<FoodEntry>(user, "food", from),
     list<{ kg: number }>(user, "weight", from),
     list<{ steps: number }>(user, "steps", from),
@@ -67,8 +69,9 @@ async function loadRaw(user: UserId): Promise<Raw> {
     list<Todo>(user, "todo", from),
     list<Record<string, number>>(user, "measure", from),
     list<{ type: string }>(user, "flag", from),
+    profile.sex === "f" ? list<Omit<CycleDay, "date">>(user, "cycle", addDays(profile.startDate, -200)) : Promise.resolve([]),
   ]);
-  return { profile, foods, weights, steps, sleep, water, workouts, todos, measures, flags, reactionsSent: 0 };
+  return { profile, foods, weights, steps, sleep, water, workouts, todos, measures, flags, cycle, reactionsSent: 0 };
 }
 
 function sumBy<T>(arr: Rec<T>[], f: (d: T) => number, date: string) {
@@ -105,7 +108,17 @@ function engineFor(raw: Raw, date: string) {
   const redFlags = raw.flags.filter((f) => f.date > addDays(date, -14) && f.date <= date).length;
   const body = bodyFor(raw, date);
   const waistTooFast = raw.profile.goal === "gain" && body.waistPerKg !== undefined && body.waistPerKg > 1;
-  return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags, { waistTooFast });
+  const cyc = cycleFor(raw, date);
+  const cycleStop = cyc.hasData && (cyc.day ?? 0) > 45 ? 1 : 0; // missed period while dieting → pause the deficit
+  return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags + cycleStop, {
+    waistTooFast,
+    cycleKcalBonus: raw.profile.goal === "lose" ? cyc.kcalBonus : 0,
+    cycleWaterWeight: cyc.waterWeightLikely,
+  });
+}
+
+function cycleFor(raw: Raw, date: string) {
+  return analyzeCycle(raw.cycle.map((c) => ({ date: c.date, ...c.data })), date);
 }
 
 function bodyFor(raw: Raw, date: string) {
@@ -375,6 +388,8 @@ export async function buildState(user: UserId) {
     todayScore,
     measures: raw.measures.slice(-8).map((m) => ({ date: m.date, ...m.data })),
     body: bodyFor(raw, today),
+    // cycle data is private: only ever returned to its owner
+    cycle: raw.profile.sex === "f" ? { ...cycleFor(raw, today), today: raw.cycle.find((c) => c.date === today)?.data ?? {}, recent: raw.cycle.slice(-60).map((c) => ({ date: c.date, ...c.data })) } : null,
     reactions: reactions.map((r) => ({ id: r.id, date: r.date, at: r.created_at, ...r.data })).reverse().slice(0, 8),
     habitDay: eng.dayIndex + 1,
     scores: {

@@ -15,6 +15,7 @@ export type Kind =
   | "measure"
   | "sleep"
   | "water"
+  | "cycle"
   | "flag";
 
 export interface Rec<T = Record<string, unknown>> {

@@ -8,6 +8,7 @@ import { useMenu } from "./useMenu";
 import { nextQuestions } from "@/lib/menu";
 import { WATER_TARGET } from "@/lib/state-constants";
 import { FOODS } from "@/lib/foods";
+import { CycleMini } from "./Cycle";
 
 function statusLine(goal: "gain" | "lose", rate: number | null, phase: string, weighIns: number, w: number) {
   if (weighIns < 4 || rate === null) return "Birkaç sabah tartıl, hızını hesaplayayım.";
@@ -34,6 +35,7 @@ export default function Today() {
       </div>
       <div className="space-y-4">
         <NextUp />
+        <CycleMini />
         <PartnerStrip />
         {s.engine.insights.filter((i) => i.tone === "warn").map((i, k) => (
           <p key={k} className="panel !py-3 text-sm" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>

@@ -1,4 +1,5 @@
 "use client";
+import CycleCard from "./Cycle";
 import { MEASURE_FIELDS } from "@/lib/body";
 import { useState } from "react";
 import { useApp, Section, Stat, fmt } from "./ui";
@@ -34,6 +35,7 @@ export default function Progress() {
           </ul>
         </Section>
 
+        <CycleCard />
         <BodyCard />
       </div>
 

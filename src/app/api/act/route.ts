@@ -3,7 +3,8 @@ import { clearSession, getSession, isUser, setSession } from "@/lib/session";
 import { add, list, remove, setDaily, update, type UserId } from "@/lib/store";
 import { getProfile, saveProfile, type Todo, type WorkoutLog } from "@/lib/state";
 import { clampTargetWeight, type FoodEntry } from "@/lib/engine";
-import { nowTime, today } from "@/lib/dates";
+import { addDays, nowTime, today } from "@/lib/dates";
+import { SYMPTOMS } from "@/lib/cycle";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
 
@@ -167,6 +168,21 @@ async function act(user: UserId, d: string, b: Body) {
     case "flag":
       await add(user, "flag", d, { type: String(b.type).slice(0, 60) });
       return;
+    case "cycle": {
+      const { profile } = await getProfile(user);
+      if (profile.sex !== "f") throw new Error("Döngü takibi bu profilde yok");
+      const date = b.date ? String(b.date) : d;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > d || date < addDays(d, -200)) throw new Error("Geçersiz tarih");
+      const prev = (await list<Record<string, unknown>>(user, "cycle", date, date))[0]?.data ?? {};
+      const next: Record<string, unknown> = { ...prev };
+      if (b.start !== undefined) next.start = !!b.start;
+      if (b.end !== undefined) next.end = !!b.end;
+      if (b.flow !== undefined) next.flow = b.flow === null ? undefined : Math.round(num(b.flow, 1, 3));
+      if (b.energy !== undefined) next.energy = b.energy === null ? undefined : Math.round(num(b.energy, 1, 5));
+      if (Array.isArray(b.symptoms)) next.symptoms = (b.symptoms as unknown[]).map(String).filter((x) => SYMPTOMS.some((s) => s.id === x)).slice(0, 10);
+      await setDaily(user, "cycle", date, next);
+      return;
+    }
     case "react": {
       const type = String(b.type);
       if (!["highfive", "cheer", "walk", "proud"].includes(type)) throw new Error("Geçersiz tepki");

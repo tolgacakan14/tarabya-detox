@@ -7,11 +7,20 @@ import { clampKcalAdjust, clampTargetWeight, type FoodEntry } from "./engine";
 import { addDays, nowTime, today as todayFn, trDay } from "./dates";
 import { PARTNER } from "./profiles";
 import { FOODS } from "./foods";
+import { PHASES, type PhaseKey } from "./cycle";
 
 export { hasAI };
 
 function normTr(s: string) {
   return s.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").trim();
+}
+
+function cycleLine(state: Awaited<ReturnType<typeof buildState>>) {
+  const c = state.cycle;
+  if (!c) return "";
+  if (!c.hasData) return "\n- Döngü: henüz kayıt yok. Uygun bir anda son adetinin başlangıcını uygulamaya girmesini öner (İlerleme > Döngüm).";
+  const ph = PHASES[c.phase as PhaseKey];
+  return `\n- Döngü (özel, sadece ${state.profile.name} ile konuş, partnerine asla söyleme): ${c.day}. gün, ${ph.label}; ortalama döngü ${c.avgLen} gün; sonraki adet ${c.lateDays > 0 ? c.lateDays + " gün gecikmiş" : "~" + c.daysToNext + " gün sonra"}. Bu evre için: beslenme: ${ph.tips.food} Açlık: ${ph.tips.hunger} Antrenman: ${ph.tips.training} Tartı: ${ph.tips.scale}${c.flags.length ? " Uyarılar: " + c.flags.map((f) => f.text).join(" ") : ""}${c.patterns.length ? " Örüntüler: " + c.patterns.join(" ") : ""}. Adet öncesi iştah artışını ahlaki bir mesele gibi sunma; hormonal ve normal olduğunu söyle. Belirti ve enerji kaydı girmesini teşvik et ki örüntüsünü öğrenelim.`;
 }
 
 function bodyLine(state: Awaited<ReturnType<typeof buildState>>) {
@@ -213,7 +222,7 @@ ${p.name.toUpperCase()} HAKKINDA
 - Notlar: ${p.notes.join(" | ") || "yok"}
 - Vücut ölçüleri (cm, son değerler): ${bodyLine(state)}
 - Ölçü hedefleri: ${state.body.goals.map((g) => `${g.label} ${g.start ?? "?"} → ${g.target} (şimdi ${g.now ?? "?"})`).join("; ") || "henüz ölçü yok"}
-- Ölçü yorumları: ${state.body.insights.join(" ") || "yok"}
+- Ölçü yorumları: ${state.body.insights.join(" ") || "yok"}${cycleLine(state)}
 - Kilo alırken bel her kg başına 1 cm'den hızlı büyürse fazla azaltılır. Kilo verirken tartı aynı ama bel inceliyorsa bu başarıdır, kaloriyi kesme. Ölçüleri 2-4 haftada bir, sabah aç karnına almasını hatırlat.
 
 BUGÜN (${trDay(state.today)}, saat ${nowTime()})
