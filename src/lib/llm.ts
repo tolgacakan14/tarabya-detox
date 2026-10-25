@@ -200,6 +200,7 @@ async function pickVisionModel(p: Provider): Promise<string | null> {
     const r = await fetch(`${p.base}/models`, { headers: { Authorization: `Bearer ${p.key}` } });
     if (r.ok) {
       const ids = (((await r.json()) as { data?: { id: string }[] }).data ?? []).map((m) => m.id.replace(/^models\//, ""));
+      console.error("vision models available", ids.join(","));
       const hit = VISION_PREF[p.name].find((m) => ids.includes(m)) ?? ids.find((m) => (p.name === "groq" ? /llama-4|vision|scout|maverick|-vl/i.test(m) : /flash/.test(m) && !/image|tts|audio|live|embed/.test(m)));
       if (hit) return (visionChosen[p.name] = hit);
     }
