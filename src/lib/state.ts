@@ -4,6 +4,7 @@ import { defaultProfile, PARTNER, type Profile } from "./profiles";
 import { runEngine, type EngineResult, type FoodEntry } from "./engine";
 import { addDays, daysBetween, today as todayFn, weekStart } from "./dates";
 import { SESSIONS, phaseFor, cardioFor, MINI, EXERCISES } from "./programs";
+import { FOODS } from "./foods";
 
 export interface WorkoutLog {
   type: "strength" | "mini" | "walk" | "run";
@@ -312,9 +313,31 @@ export async function buildState(user: UserId) {
     void i;
   });
 
+  // what they actually eat: counts by list food id + favourites for one-tap relog
+  const eatenCounts: Record<string, number> = {};
+  const favMap = new Map<string, { entry: FoodEntry; n: number; last: string }>();
+  for (const f of raw.foods) {
+    const id = FOODS.find((x) => x.name === f.data.name)?.id;
+    if (id) eatenCounts[id] = (eatenCounts[id] ?? 0) + 1;
+    const key = f.data.name + "|" + (f.data.amount ?? "");
+    const cur = favMap.get(key);
+    favMap.set(key, { entry: f.data, n: (cur?.n ?? 0) + 1, last: f.date });
+  }
+  const favorites = [...favMap.values()]
+    .sort((a, b) => b.n - a.n || b.last.localeCompare(a.last))
+    .slice(0, 8)
+    .map((x) => ({ name: x.entry.name, amount: x.entry.amount, kcal: x.entry.kcal, protein: x.entry.protein, carbs: x.entry.carbs, fat: x.entry.fat, times: x.n }));
+  const yesterday = addDays(today, -1);
+  const yesterdayFoods = raw.foods.filter((f) => f.date === yesterday).map((f) => f.data);
+  const lastWeight = [...raw.weights].reverse()[0]?.data.kg;
+
   return {
     today,
     user,
+    eatenCounts,
+    favorites,
+    yesterdayFoods,
+    lastWeight,
     profile: { ...raw.profile, pin: undefined },
     hasPin: !!raw.profile.pin,
     engine: eng,

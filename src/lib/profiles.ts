@@ -27,6 +27,8 @@ export interface Profile {
   onboarded: boolean;
   notes: string[]; // things the coach should remember
   pin?: string;
+  /** Explicit food preferences: 2 = loves, 1 = eats, -1 = won't eat. Missing = unknown. */
+  foodPrefs?: Record<string, number>;
 }
 
 export const PARTNER: Record<UserId, UserId> = { tolga: "eylul", eylul: "tolga" };

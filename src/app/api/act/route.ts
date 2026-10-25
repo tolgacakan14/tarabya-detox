@@ -130,6 +130,37 @@ async function act(user: UserId, d: string, b: Body) {
       await setDaily(user, "measure", d, m);
       return;
     }
+    case "foodPref": {
+      const id = String(b.foodId);
+      if (!FOODS.some((f) => f.id === id)) throw new Error("Yemek bulunamadı");
+      const v = b.value === null ? null : Number(b.value);
+      if (v !== null && ![2, 1, -1].includes(v)) throw new Error("Geçersiz tercih");
+      const { profile } = await getProfile(user);
+      const prefs = { ...(profile.foodPrefs ?? {}) };
+      if (v === null) delete prefs[id];
+      else prefs[id] = v;
+      await saveProfile(user, { ...profile, foodPrefs: prefs });
+      return;
+    }
+    case "addFoods": {
+      // one-tap relog of several entries (favourites / yesterday's meal)
+      const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 12) as FoodEntry[];
+      for (const e of entries) {
+        await add<FoodEntry>(user, "food", d, {
+          name: String(e.name).slice(0, 80),
+          amount: e.amount ? String(e.amount).slice(0, 60) : undefined,
+          kcal: num(e.kcal, 0, 5000),
+          protein: num(e.protein ?? 0, 0, 400),
+          carbs: num(e.carbs ?? 0, 0, 800),
+          fat: num(e.fat ?? 0, 0, 400),
+          meal: e.meal ? String(e.meal) : undefined,
+          planned: b.planned === true,
+          time: nowTime(),
+          source: "quick",
+        });
+      }
+      return;
+    }
     case "flag":
       await add(user, "flag", d, { type: String(b.type).slice(0, 60) });
       return;

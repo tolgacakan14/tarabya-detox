@@ -6,8 +6,21 @@ import { buildState, getProfile, saveProfile, type WorkoutLog } from "./state";
 import { clampKcalAdjust, clampTargetWeight, type FoodEntry } from "./engine";
 import { addDays, nowTime, today as todayFn, trDay } from "./dates";
 import { PARTNER } from "./profiles";
+import { FOODS } from "./foods";
 
 export { hasAI };
+
+function normTr(s: string) {
+  return s.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c").trim();
+}
+
+function prefNames(prefs: Record<string, number> | undefined, test: (v: number) => boolean) {
+  return Object.entries(prefs ?? {})
+    .filter(([, v]) => test(v))
+    .map(([id]) => FOODS.find((f) => f.id === id)?.name)
+    .filter(Boolean)
+    .join(", ");
+}
 
 const foodItemSchema = {
   type: "object" as const,
@@ -100,6 +113,15 @@ const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: "set_food_pref",
+    description: "Kullanıcının bir yiyeceği yiyip yemediğini kaydeder. Menü sadece yediklerinden kurulur. value: 2 = çok sever, 1 = yer, -1 = yemez.",
+    input_schema: {
+      type: "object",
+      properties: { food: { type: "string", description: "Yiyecek adı, örn. 'menemen', 'kuru fasulye'" }, value: { type: "number", enum: [2, 1, -1] } },
+      required: ["food", "value"],
+    },
+  },
+  {
     name: "remember",
     description: "Koçun ileride hatırlaması gereken kısa bir notu kaydeder (program saatleri, sakatlık, tercih vb.).",
     input_schema: { type: "object", properties: { note: { type: "string" } }, required: ["note"] },
@@ -167,6 +189,7 @@ ${p.name.toUpperCase()} HAKKINDA
 - Bugünkü hedefler: ${t.kcal} kcal, ${t.protein} g protein, ${t.carbs} g karbonhidrat, ${t.fat} g yağ, ${t.steps} adım, ${8} bardak su. Haftada ${t.sessionsPerWeek} antrenman.
 - Ekipman: ${p.equipment}
 - Sevdikleri: ${p.likes || "bilinmiyor"} / Sevmedikleri: ${p.dislikes || "bilinmiyor"}
+- Seçici yiyici. Yediği yiyecekler: ${prefNames(p.foodPrefs, (v) => v > 0) || "henüz bilinmiyor"}. Yemedikleri: ${prefNames(p.foodPrefs, (v) => v < 0) || "henüz bilinmiyor"}. Menü ve öneriler SADECE yediği yiyeceklerden olsun; yeni bir şey önereceksen tek bir küçük deneme olarak öner ve ısrar etme. Yeni bir tercih öğrenirsen set_food_pref ile kaydet.
 - Neden istiyor: ${p.why || "henüz sormadın, uygun bir anda sor"}
 - Eğer-ise planları: ${p.ifThen.join(" | ") || "yok"}
 - Notlar: ${p.notes.join(" | ") || "yok"}
@@ -263,6 +286,19 @@ async function runTool(user: UserId, name: string, input: Record<string, unknown
       if (Array.isArray(input.if_then)) profile.ifThen = (input.if_then as string[]).slice(0, 6);
       await saveProfile(user, profile);
       return "Tercihler güncellendi.";
+    }
+    case "set_food_pref": {
+      const q = normTr(String(input.food));
+      const f = FOODS.find((x) => normTr(x.name).includes(q) || q.includes(normTr(x.name).split(" ")[0]));
+      const v = Number(input.value);
+      if (!f || ![2, 1, -1].includes(v)) {
+        profile.notes = [...profile.notes, `${v < 0 ? "Yemez" : "Yer"}: ${input.food}`].slice(-20);
+        await saveProfile(user, profile);
+        return "Listede yok, not olarak kaydedildi.";
+      }
+      profile.foodPrefs = { ...(profile.foodPrefs ?? {}), [f.id]: v };
+      await saveProfile(user, profile);
+      return `${f.name}: ${v < 0 ? "yemez" : v === 2 ? "çok sever" : "yer"} olarak kaydedildi.`;
     }
     case "remember": {
       profile.notes = [...profile.notes, String(input.note)].slice(-20);
