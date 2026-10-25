@@ -102,7 +102,7 @@ export function runEngine(
   intakeByDate: Record<string, number>,
   stepsByDate: Record<string, number>,
   redFlagsRecent: number,
-  opts: { waistTooFast?: boolean; cycleKcalBonus?: number; cycleWaterWeight?: boolean } = {}
+  opts: { waistTooFast?: boolean; cycleKcalBonus?: number; cycleWaterWeight?: boolean; exerciseKcal?: number; exerciseBurn?: number } = {}
 ): EngineResult {
   const dayIndex = Math.max(0, daysBetween(p.startDate, today));
   const week = Math.floor(dayIndex / 7) + 1;
@@ -208,6 +208,18 @@ export function runEngine(
   }
   if (opts.cycleWaterWeight) insights.push({ tone: "info", text: "Bu günlerde tartıdaki artış büyük ihtimalle su tutulumu, yağ değil. Trende bak." });
 
+  if (opts.exerciseBurn && opts.exerciseBurn >= 40) {
+    kcal += opts.exerciseKcal ?? 0;
+    insights.push({
+      tone: "good",
+      text:
+        p.goal === "gain"
+          ? `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı; kilo almaya devam etmen için hedefine +${opts.exerciseKcal} kcal ekledim.`
+          : (opts.exerciseKcal ?? 0) > 0
+            ? `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı. Büyük bir seans olduğu için hedefine +${opts.exerciseKcal} kcal ekledim, gerisi yağ yakımına gidiyor.`
+            : `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı. Hedefini artırmıyorum; bu açık doğrudan yağ yakımına gidiyor.`,
+    });
+  }
   kcal += p.kcalAdjust;
   kcal = Math.max(floor, kcal);
   if (p.goal === "gain") kcal = Math.max(kcal, Math.round(tdee));

@@ -7,6 +7,7 @@ import { SESSIONS, phaseFor, cardioFor, MINI, EXERCISES } from "./programs";
 import { FOODS } from "./foods";
 import { analyzeBody, type Measure } from "./body";
 import { analyzeCycle, type CycleDay } from "./cycle";
+import { eatBack, metFor, musclesFromLabel, workoutImpact, type Activity, type Muscle } from "./activity";
 
 export interface WorkoutLog {
   type: "strength" | "mini" | "walk" | "run";
@@ -14,6 +15,12 @@ export interface WorkoutLog {
   minutes?: number;
   withPartner?: boolean;
   exercises?: { id: string; level: number; sets: number[] }[];
+  // self-planned session described by the user
+  custom?: boolean;
+  desc?: string;
+  activities?: Activity[];
+  kcal?: number; // net kcal above rest, computed server-side
+  muscles?: Partial<Record<Muscle, number>>;
 }
 
 export interface Todo {
@@ -109,12 +116,44 @@ function engineFor(raw: Raw, date: string) {
   const body = bodyFor(raw, date);
   const waistTooFast = raw.profile.goal === "gain" && body.waistPerKg !== undefined && body.waistPerKg > 1;
   const cyc = cycleFor(raw, date);
+  const extra = extraBurn(raw, date);
   const cycleStop = cyc.hasData && (cyc.day ?? 0) > 45 ? 1 : 0; // missed period while dieting → pause the deficit
   return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags + cycleStop, {
     waistTooFast,
     cycleKcalBonus: raw.profile.goal === "lose" ? cyc.kcalBonus : 0,
     cycleWaterWeight: cyc.waterWeightLikely,
+    exerciseKcal: eatBack(raw.profile.goal, extra.kcal),
+    exerciseBurn: extra.kcal,
   });
+}
+
+/** Energy burned on `date` by activity that the base TDEE doesn't already assume.
+ * Planned strength sessions are inside the activity factor; cardio, sport and sessions beyond the weekly plan are extra. */
+function extraBurn(raw: Raw, date: string) {
+  const kg = [...raw.weights].reverse().find((w) => w.date <= date)?.data.kg ?? raw.profile.startWeight;
+  const ws = weekStart(date);
+  const plannedPerWeek = raw.profile.goal === "gain" ? 3 : 3;
+  let kcal = 0;
+  const strengthBefore = raw.workouts.filter((w) => w.data.type === "strength" && w.date >= ws && w.date < date).length;
+  let strengthToday = 0;
+  for (const w of raw.workouts.filter((x) => x.date === date)) {
+    const d = w.data;
+    if (d.custom && d.kcal) {
+      if (d.type === "strength") {
+        strengthToday++;
+        if (strengthBefore + strengthToday > plannedPerWeek) kcal += d.kcal;
+        else {
+          // only the cardio part of a mixed session is extra
+          const cardio = (d.activities ?? []).filter((a) => a.category !== "strength");
+          kcal += cardio.reduce((t, a) => t + Math.max(0, metFor(a) - 1) * kg * (a.minutes / 60), 0);
+        }
+      } else kcal += d.kcal;
+    } else if (d.type === "walk" || d.type === "run") {
+      const met = d.type === "run" ? 9 : 4;
+      kcal += (met - 1) * kg * ((d.minutes ?? 30) / 60);
+    }
+  }
+  return { kcal: Math.round(kcal) };
 }
 
 function cycleFor(raw: Raw, date: string) {
@@ -359,9 +398,25 @@ export async function buildState(user: UserId) {
   const yesterdayFoods = raw.foods.filter((f) => f.date === yesterday).map((f) => f.data);
   const lastWeight = [...raw.weights].reverse()[0]?.data.kg;
 
+  // weekly hard sets per muscle: planned program sets + self-planned sessions
+  const weekMuscles: Partial<Record<Muscle, number>> = {};
+  for (const w of raw.workouts.filter((x) => x.date >= ws)) {
+    for (const e of w.data.exercises ?? []) {
+      const def = EXERCISES[e.id];
+      if (!def) continue;
+      const done = e.sets.filter((x) => x > 0).length;
+      musclesFromLabel(def.muscle).forEach((m, i) => (weekMuscles[m] = (weekMuscles[m] ?? 0) + (i === 0 ? done : done * 0.5)));
+    }
+    for (const [m, v] of Object.entries(w.data.muscles ?? {})) weekMuscles[m as Muscle] = (weekMuscles[m as Muscle] ?? 0) + (v ?? 0);
+  }
+  const muscleTarget = raw.profile.goal === "gain" ? (eng.week <= 3 ? 8 : eng.week <= 8 ? 12 : 14) : eng.week <= 6 ? 6 : 9;
+
   return {
     today,
     user,
+    weekMuscles,
+    muscleTarget,
+    extraBurnToday: extraBurn(raw, today).kcal,
     eatenCounts,
     favorites,
     yesterdayFoods,

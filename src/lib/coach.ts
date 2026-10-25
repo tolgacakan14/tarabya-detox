@@ -8,6 +8,7 @@ import { addDays, nowTime, today as todayFn, trDay } from "./dates";
 import { PARTNER } from "./profiles";
 import { FOODS } from "./foods";
 import { PHASES, type PhaseKey } from "./cycle";
+import { LOG_CUSTOM_TOOL, logCustomWorkout, sanitizeActivities } from "./workouts-server";
 
 export { hasAI };
 
@@ -61,6 +62,7 @@ const foodItemSchema = {
 };
 
 const TOOLS: ToolDef[] = [
+  LOG_CUSTOM_TOOL,
   {
     name: "log_food",
     description:
@@ -318,6 +320,13 @@ async function runTool(user: UserId, name: string, input: Record<string, unknown
       if (Array.isArray(input.if_then)) profile.ifThen = (input.if_then as string[]).slice(0, 6);
       await saveProfile(user, profile);
       return "Tercihler güncellendi.";
+    }
+    case "log_custom_workout": {
+      const acts = sanitizeActivities(input.activities);
+      if (!acts.length) return "Aktivite anlaşılamadı, süresini ve ne yaptığını sor.";
+      const imp = await logCustomWorkout(user, acts, input.description ? String(input.description) : undefined, input.with_partner === true);
+      const ms = Object.entries(imp.muscles).map(([m, v]) => `${m} ${v} set`).join(", ");
+      return `Kaydedildi: ${imp.minutes} dk, ~${imp.kcal} kcal net yakım. ${imp.countsAs === "strength" ? "Kuvvet antrenmanı olarak sayıldı (haftalık antrenman sayısına işlendi)." : "Kardiyo olarak sayıldı."}${ms ? " Kas hacmi: " + ms + "." : ""} ${profile.goal === "gain" ? "Ekstra yakılan kalori bugünkü hedefe eklenir (plana denk gelen kuvvet seansı hariç)." : "Kilo verme planında egzersiz kalorisi geri yenmez; 250 kcal üstü seanslarda dörtte biri eklenir."}`;
     }
     case "set_food_pref": {
       const q = normTr(String(input.food));

@@ -1,4 +1,5 @@
 "use client";
+import { CustomWorkout, MuscleVolume } from "./CustomWorkout";
 import { useState } from "react";
 import { useApp, Section } from "./ui";
 import { EXERCISES, SESSIONS } from "@/lib/programs";
@@ -39,6 +40,7 @@ export default function Workout() {
 
   return (
     <div className="grid grid-cols-1 gap-4">
+      <CustomWorkout />
       <Section
         title={session.title}
         aside={
@@ -175,9 +177,10 @@ export default function Workout() {
               {doneToday.map((w) => (
                 <li key={w.id} className="flex justify-between gap-2">
                   <span>
-                    {{ strength: "Kuvvet antrenmanı", mini: "Mini antrenman", walk: "Yürüyüş", run: "Koşu" }[w.type]}
+                    {w.custom ? w.activities?.map((a) => a.name).join(" + ") || "Kendi antrenmanım" : { strength: "Kuvvet antrenmanı", mini: "Mini antrenman", walk: "Yürüyüş", run: "Koşu" }[w.type]}
                     {w.session ? ` ${w.session}` : ""}
                     {w.minutes ? `, ${w.minutes} dk` : ""}
+                    {w.kcal ? `, ~${w.kcal} kcal` : ""}
                     {w.withPartner ? ", birlikte" : ""}
                   </span>
                   <button className="label underline" onClick={() => act({ action: "delete", id: w.id })}>
@@ -189,6 +192,7 @@ export default function Workout() {
           </Section>
         )}
       </div>
+      <MuscleVolume />
     </div>
   );
 }

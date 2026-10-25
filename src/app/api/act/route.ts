@@ -5,6 +5,7 @@ import { getProfile, saveProfile, type Todo, type WorkoutLog } from "@/lib/state
 import { clampTargetWeight, type FoodEntry } from "@/lib/engine";
 import { addDays, nowTime, today } from "@/lib/dates";
 import { SYMPTOMS } from "@/lib/cycle";
+import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
 
@@ -98,6 +99,10 @@ async function act(user: UserId, d: string, b: Body) {
         const last = recs[recs.length - 1];
         if (last) await remove(user, last.id);
       }
+      return;
+    }
+    case "customWorkout": {
+      await logCustomWorkout(user, sanitizeActivities(b.activities), b.desc ? String(b.desc) : undefined, !!b.withPartner);
       return;
     }
     case "workout": {
