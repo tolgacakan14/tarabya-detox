@@ -475,6 +475,7 @@ export async function buildState(user: UserId) {
     weighedToday: raw.weights.find((w) => w.date === today)?.data.kg,
     workoutsToday: raw.workouts.filter((w) => w.date === today).map((w) => ({ id: w.id, ...w.data })),
     program,
+    build: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
     plan: {
       training,
       session: nextSession,

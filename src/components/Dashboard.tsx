@@ -30,6 +30,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [err, setErr] = useState("");
   const [loadErr, setLoadErr] = useState(false);
+  const [firstBuild, setFirstBuild] = useState<string | null>(null);
   const [fire, setFire] = useState(0);
 
   const reload = useCallback(async () => {
@@ -45,7 +46,9 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
       return;
     }
     if (r.ok) {
-      setS(await r.json());
+      const j = await r.json();
+      setS(j);
+      setFirstBuild((b) => b ?? j.build);
       setLoadErr(false);
     } else setLoadErr(true);
   }, [router]);
@@ -176,6 +179,11 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
               <QuickLog autoFocus onDone={() => setSheet(false)} />
             </div>
           </div>
+        )}
+        {firstBuild && s.build !== firstBuild && (
+          <button className="fixed top-3 left-1/2 -translate-x-1/2 z-50 btn btn-me !py-2 !px-4 shadow-xl press" onClick={() => window.location.reload()}>
+            ✨ Yeni sürüm hazır · Yenile
+          </button>
         )}
         <nav
           className="fixed bottom-3 left-3 right-3 mx-auto max-w-[424px] grid grid-cols-6 rounded-3xl shadow-xl z-40"

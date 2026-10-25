@@ -181,9 +181,13 @@ function systemPrompt(state: Awaited<ReturnType<typeof buildState>>) {
   const gain = p.goal === "gain";
   const tasks = state.todayScore.tasks.map((x) => `${x.done ? "[x]" : "[ ]"} ${x.label}`).join("\n");
   const foods = state.foods.map((f) => `- ${f.time ?? ""} ${f.name} (${f.amount ?? ""}): ${f.kcal} kcal, ${f.protein} g protein${f.planned === false ? ", plansız" : ""}`).join("\n") || "(henüz kayıt yok)";
+  const pg = state.program;
+  const programLine = `PROGRAM: ${pg.title}, ${pg.week}. hafta (${pg.phase.name}). Bu hafta ${pg.sessionsDone}/${pg.sessionsPlanned} antrenman. Bugün: ${pg.todayEntry?.label ?? "dinlen"}.${pg.session ? ` Sıradaki seans: ${pg.session.title} (~${pg.session.estMinutes} dk), Spor sekmesindeki rehberli oynatıcıdan başlatılır.` : ""} Koç notu: ${pg.coachNote}`;
   const week7 = e.week7.map((d) => `${d.date}: ${d.intake ?? "kayıt yok"}`).join(", ");
 
   return `Sen "${p.name}" için kişisel diyet ve antrenman koçusun. Uygulama "İkimiz": Tolga ve Eylül adında bir çiftin ortak sitesi. ${p.name} ${gain ? "sağlıklı kilo almak" : "sağlıklı şekilde yağ yakmak"} istiyor; partneri ${state.scores.partner.name} ise ${gain ? "kilo vermek" : "kilo almak"} istiyor.
+
+${programLine}
 
 DİL VE TON
 - Türkçe, samimi, sen diliyle konuş. Kısa yaz: çoğu yanıt 2-5 cümle. Sonda tek somut sonraki adım.
@@ -194,11 +198,13 @@ DİL VE TON
 
 KANITA DAYALI KURALLAR (kendi kafandan değiştirme)
 ${gain
-  ? `- Hedef: haftada vücut ağırlığının ~%0.5'i (0.25-0.3 kg). Fazla ~+300-400 kcal. Protein 1.6-2.2 g/kg, öğün başı ~25 g.
+  ? `- ${p.intensity !== "standard" ? "YOĞUN MOD AÇIK (kullanıcı hızlı sonuç istedi, metabolizması hızlı): fazla ~+500 kcal, 2 g/kg protein, tartı yatay giderse hızlıca artır." : "Standart mod."}
+- Hedef: haftada vücut ağırlığının ~%0.5'i (0.25-0.4 kg). Protein 1.6-2.2 g/kg, öğün başı ~25 g.
 - Düzensiz yeme: "minimum gün" = 3 çapa öğün (her biri 600+ kcal, 25+ g protein) + 1 shake. Enerji yoğun seçenekler: tahin-pekmez, kuruyemiş, tam yağlı süt, shake.
 - Antrenman: evde vücut ağırlığı + dambıl, tüm vücut A/B haftada 3. Tekrar aralığının üstüne çıkınca daha zor varyasyon. Koşu günlerinde ek kalori.
 - Plato: 3 hafta trend yataysa +150 kcal öner.`
-  : `- Hedef: haftada vücut ağırlığının %0.4-0.5'i (~0.25 kg), en fazla %0.7. Açık ~250 kcal (yarısı yemekten, yarısı adımdan).
+  : `- ${p.intensity !== "standard" ? "YOĞUN MOD AÇIK (sert diyet istendi, hareketsiz yaşam): ~%22 açık ama asla güvenlik tabanının altı yok; egzersiz kalorisi geri yenmez; adet öncesi pay en fazla +100. Atıştırmayı sınırla, porsiyonları küçük tut, adımları ve antrenmanı en güçlü kaldıraç olarak öne çıkar." : "Standart mod: açık ~250 kcal."}
+- Hedef: haftada vücut ağırlığının %0.5-0.9'u, kas kaybetmemek için daha hızlısı yok.
 - Güvenlik tabanı: ${e.floor} kcal'nin altını asla önerme. Hedef kilo BMI 18.5 (${(18.5 * (p.heightCm / 100) ** 2).toFixed(1)} kg) altına inemez. BMI 19.5 altına yaklaşırken doktor/diyetisyen kontrolü öner.
 - 8 hafta açıktan sonra 2 hafta bakım (otomatik). Yorgunluk/motivasyon düşerse start_maintenance öner.
 - Protein ~1.8 g/kg, lif 25+ g, yağ en az %25. Demir, kalsiyum, D vitamini için kan tahlili öner, doz yazma.

@@ -31,6 +31,8 @@ export async function POST(req: Request) {
   }
   const j = (await r.json()) as { text?: string };
   const text = (j.text ?? "").trim().slice(0, 400);
-  if (!text) return NextResponse.json({ error: "Bir şey duyamadım, tekrar dener misin?" }, { status: 422 });
+  // Whisper "hears" subtitle credits in silence/noise; treat those as nothing heard
+  const junk = /altyaz[ıi]|m\.?\s?k\.|abone ol|izledi[ğg]iniz i[çc]in|teşekkürler\.?$|^\W*$/i;
+  if (!text || (junk.test(text) && text.length < 60)) return NextResponse.json({ error: "Bir şey duyamadım, telefonu ağzına yaklaştırıp tekrar dener misin?" }, { status: 422 });
   return NextResponse.json({ text });
 }
