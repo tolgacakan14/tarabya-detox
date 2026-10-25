@@ -19,7 +19,7 @@ export default function Food() {
   const asks = nextQuestions(prefs, 3);
 
   return (
-    <div className="grid lg:grid-cols-[1.3fr_1fr] gap-4 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 items-start">
       <div className="space-y-4">
         <section className="panel">
           <div className="flex items-baseline justify-between gap-2">

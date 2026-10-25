@@ -27,7 +27,7 @@ function statusLine(goal: "gain" | "lose", rate: number | null, phase: string, w
 export default function Today() {
   const { s } = useApp();
   return (
-    <div className="grid lg:grid-cols-[1.25fr_1fr] gap-4 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-4 items-start">
       <div className="space-y-4">
         <ProgressHero />
         <RingsCard />

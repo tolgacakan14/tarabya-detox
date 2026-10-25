@@ -53,8 +53,8 @@ export default function Coach() {
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_300px] gap-4">
-      <Section className="flex flex-col min-h-[65vh]">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
+      <Section className="flex flex-col min-h-[65vh] min-w-0">
         <div className="flex-1 space-y-3 overflow-y-auto">
           {msgs.length === 0 && (
             <div className="text-center py-6">
@@ -82,7 +82,7 @@ export default function Coach() {
           )}
           <div ref={end} />
         </div>
-        <div className="flex gap-2 scroll-x mt-3">
+        <div className="flex gap-2 scroll-x mt-3 max-w-full min-w-0">
           {STARTERS[s.profile.goal].map((x) => (
             <button key={x} className="chip whitespace-nowrap" onClick={() => send(x)} disabled={busy}>
               {x}

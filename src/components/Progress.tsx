@@ -16,7 +16,7 @@ export default function Progress() {
   });
 
   return (
-    <div className="grid lg:grid-cols-[1.4fr_1fr] gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
       <div className="space-y-4">
         <Section title="Kilo trendi" aside={<span className="label">Günlük tartı dalgalanır, çizgi gerçeği gösterir</span>}>
           <div className="grid grid-cols-3 gap-3 mb-4">

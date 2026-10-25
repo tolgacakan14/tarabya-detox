@@ -61,9 +61,9 @@ export default function Avatar({ who, mood = "happy", level = 1, size = 160, cla
           <stop offset="100%" stopColor={s.blush} stopOpacity="0" />
         </radialGradient>
         <radialGradient id={`hr${id}`} cx="38%" cy="22%" r="85%">
-          <stop offset="0%" stopColor={who === "tolga" ? "#5a4a40" : "#7a5140"} />
-          <stop offset="45%" stopColor={who === "tolga" ? "#2a211c" : "#4a2c20"} />
-          <stop offset="100%" stopColor={who === "tolga" ? "#120d0b" : "#24130d"} />
+          <stop offset="0%" stopColor={who === "tolga" ? "#5a4a40" : "#5a3a2e"} />
+          <stop offset="45%" stopColor={who === "tolga" ? "#2a211c" : "#2c1913"} />
+          <stop offset="100%" stopColor={who === "tolga" ? "#120d0b" : "#120a07"} />
         </radialGradient>
         <radialGradient id={`curl${id}`} cx="35%" cy="30%" r="70%">
           <stop offset="0%" stopColor="#5b4b41" />
@@ -81,13 +81,13 @@ export default function Avatar({ who, mood = "happy", level = 1, size = 160, cla
           <stop offset="100%" stopColor="#3a1e0f" />
         </linearGradient>
         <radialGradient id={`ir${id}`} cx="45%" cy="40%" r="60%">
-          <stop offset="0%" stopColor={who === "tolga" ? "#9a6438" : "#a9d4f2"} />
-          <stop offset="70%" stopColor={who === "tolga" ? "#4d2c15" : "#4f8cc4"} />
-          <stop offset="100%" stopColor={who === "tolga" ? "#22120a" : "#234d78"} />
+          <stop offset="0%" stopColor={who === "tolga" ? "#9a6438" : "#c6e6ea"} />
+          <stop offset="70%" stopColor={who === "tolga" ? "#4d2c15" : "#5f97a6"} />
+          <stop offset="100%" stopColor={who === "tolga" ? "#22120a" : "#2b5663"} />
         </radialGradient>
         <linearGradient id={`tee${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={who === "tolga" ? "#ffffff" : "#33303a"} />
-          <stop offset="100%" stopColor={who === "tolga" ? "#dfe4e3" : "#121116"} />
+          <stop offset="0%" stopColor={who === "tolga" ? "#ffffff" : "#f7f2ea"} />
+          <stop offset="100%" stopColor={who === "tolga" ? "#dfe4e3" : "#d9cfc1"} />
         </linearGradient>
       </defs>
 
@@ -270,46 +270,74 @@ function Eylul({ id, mood }: { id: string; mood: Mood }) {
   const s = SKIN.eylul;
   return (
     <g>
-      {/* long hair behind shoulders */}
-      <path d="M100 28 C56 28, 36 62, 38 106 C40 146, 30 182, 26 214 L174 214 C170 182, 160 146, 162 106 C164 62, 144 28, 100 28 Z" fill={`url(#hr${id})`} />
+      {/* long dark hair falling behind the shoulders */}
+      <path d="M100 26 C56 26, 34 60, 37 106 C40 148, 32 184, 28 214 L172 214 C168 184, 160 148, 163 106 C166 60, 144 26, 100 26 Z" fill={`url(#hr${id})`} />
 
-      {/* shoulders + black strappy top + heart necklace */}
-      <path d="M28 214 C32 186, 58 174, 80 170 L120 170 C142 174, 168 186, 172 214 Z" fill={s.base} />
-      <path d="M54 214 C58 196, 74 188, 100 188 C126 188, 142 196, 146 214 Z" fill={`url(#tee${id})`} />
-      <path d="M72 190 L76 172 M128 190 L124 172" stroke="#15141a" strokeWidth="3" strokeLinecap="round" />
-      <path d="M84 134 L116 134 L118 172 C108 178, 92 178, 82 172 Z" fill={`url(#nk${id})`} />
-      <path d="M86 164 C92 180, 108 180, 114 164" stroke="#e5c06a" strokeWidth="1.3" fill="none" />
-      <path d="M100 183 c-2.6-3.8-7.6-1.2-4.8 2.8 l4.8 4.6 l4.8-4.6 c2.8-4-2.2-6.6-4.8-2.8z" fill="#f0c85c" />
+      {/* cream fluffy sweater */}
+      <path d="M22 214 C26 184, 56 170, 82 166 L118 166 C144 170, 174 184, 178 214 Z" fill={`url(#tee${id})`} />
+      <path d="M80 168 C88 181, 112 181, 120 168" fill="none" stroke="#cbbfae" strokeWidth="3" strokeLinecap="round" />
+      <g fill="#fff" opacity="0.5">
+        {[[46, 196], [60, 188], [72, 202], [132, 194], [146, 204], [156, 190], [100, 200], [118, 206], [86, 196]].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="1.6" />
+        ))}
+      </g>
+      {/* neck */}
+      <path d="M85 134 L115 134 L117 170 C108 176, 92 176, 83 170 Z" fill={`url(#nk${id})`} />
+
+      {/* a lock of hair falling over the shoulder (viewer's left) */}
+      <path d="M50 104 C44 140, 48 172, 66 214 L50 214 C36 176, 34 138, 40 104 Z" fill={`url(#hr${id})`} />
+
+      {/* ears with gold hoops (hair is pulled back) */}
+      <ellipse cx="57" cy="106" rx="7" ry="11" fill={s.base} />
+      <ellipse cx="143" cy="106" rx="7" ry="11" fill={s.base} />
+      <ellipse cx="57.5" cy="106" rx="3" ry="6" fill={s.lo} opacity="0.45" />
+      <ellipse cx="142.5" cy="106" rx="3" ry="6" fill={s.lo} opacity="0.45" />
+      <circle cx="56" cy="121" r="5.5" fill="none" stroke="#d8a83c" strokeWidth="2.6" />
+      <circle cx="144" cy="121" r="5.5" fill="none" stroke="#d8a83c" strokeWidth="2.6" />
+      <path d="M52 118 a5.5 5.5 0 0 1 4 -2.4" stroke="#fff3c4" strokeWidth="1.2" fill="none" />
 
       {/* head */}
       <path d="M100 52 C125 52 142 72 142 100 C142 124 132 144 116 155 C108 161 92 161 84 155 C68 144 58 124 58 100 C58 72 75 52 100 52 Z" fill={`url(#sk${id})`} />
 
-      {/* blush */}
-      <ellipse cx="72" cy="121" rx="13" ry="8.5" fill={`url(#bl${id})`} />
-      <ellipse cx="128" cy="121" rx="13" ry="8.5" fill={`url(#bl${id})`} />
+      {/* rosy cheeks + light freckles */}
+      <ellipse cx="73" cy="119" rx="13" ry="8.5" fill={`url(#bl${id})`} />
+      <ellipse cx="127" cy="119" rx="13" ry="8.5" fill={`url(#bl${id})`} />
+      <g fill="#b9735a" opacity="0.28">
+        {[[86, 112], [90, 116], [94, 111.5], [106, 111.5], [110, 116], [114, 112], [81, 117], [119, 117], [97, 108], [103, 108]].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="0.9" />
+        ))}
+      </g>
 
-      {/* nose */}
-      <ellipse cx="100" cy="113" rx="5.5" ry="4.5" fill={s.lo} opacity="0.3" />
-      <ellipse cx="99.4" cy="110.5" rx="2.6" ry="2.4" fill="#fff" opacity="0.5" />
-      <path d="M95.5 116.5 Q100 119 104.5 116.5" stroke={s.lo} strokeWidth="1.8" fill="none" strokeLinecap="round" opacity="0.75" />
+      {/* straight nose */}
+      <path d="M98 96 C97.5 104, 96.5 110, 96.5 113" stroke={s.lo} strokeWidth="1.6" fill="none" opacity="0.35" strokeLinecap="round" />
+      <ellipse cx="100" cy="114" rx="5.5" ry="4.2" fill={s.lo} opacity="0.28" />
+      <ellipse cx="99.6" cy="111.6" rx="2.4" ry="2.2" fill="#fff" opacity="0.55" />
+      <path d="M95.5 117 Q100 119.4 104.5 117" stroke={s.lo} strokeWidth="1.7" fill="none" strokeLinecap="round" opacity="0.75" />
 
       <EylulMouth mood={mood} />
 
-      <Eyes id={id} mood={mood} y={101} gap={18} lashes />
+      <Eyes id={id} mood={mood} y={100} gap={18} lashes />
 
-      {/* soft brows */}
-      <path d="M71 86 C76 81, 86 80, 92 83 C92 86, 90 86.5, 88 86 C83 84.5, 77 85.5, 73 88.5 C70.5 89.5, 69.5 87.5, 71 86 Z" fill="#3b2218" />
-      <path d="M129 86 C124 81, 114 80, 108 83 C108 86, 110 86.5, 112 86 C117 84.5, 123 85.5, 127 88.5 C129.5 89.5, 130.5 87.5, 129 86 Z" fill="#3b2218" />
+      {/* defined, arched dark brows */}
+      <path d="M69 88 C74 80.5, 85 78.5, 93 82.5 C93.5 86, 91.5 87, 89 86.4 C84 84.8, 77 85.4, 72.5 90 C70 91.4, 68 90, 69 88 Z" fill="#2a1710" />
+      <path d="M131 88 C126 80.5, 115 78.5, 107 82.5 C106.5 86, 108.5 87, 111 86.4 C116 84.8, 123 85.4, 127.5 90 C130 91.4, 132 90, 131 88 Z" fill="#2a1710" />
 
-      {/* front hair: middle part, glossy, framing the face */}
-      <path d="M100 32 C68 32, 48 52, 46 86 C44 120, 50 160, 42 214 L30 214 C36 160, 32 118, 36 86 C42 46, 70 26, 100 26 Z" fill={`url(#hr${id})`} />
-      <path d="M100 32 C132 32, 152 52, 154 86 C156 120, 150 160, 158 214 L170 214 C164 160, 168 118, 164 86 C158 46, 130 26, 100 26 Z" fill={`url(#hr${id})`} />
-      <path d="M100 34 C80 36, 64 50, 58 72 C54 88, 55 106, 52 128 C60 104, 64 84, 76 66 C84 54, 92 48, 100 46 Z" fill={`url(#hr${id})`} />
-      <path d="M100 34 C120 36, 136 50, 142 72 C146 88, 145 106, 148 128 C140 104, 136 84, 124 66 C116 54, 108 48, 100 46 Z" fill={`url(#hr${id})`} />
-      {/* glossy sheen bands */}
-      <path d="M86 36 C70 44, 60 60, 56 80" stroke="#b07a62" strokeWidth="4" fill="none" opacity="0.35" strokeLinecap="round" />
-      <path d="M114 36 C130 44, 140 60, 144 80" stroke="#b07a62" strokeWidth="4" fill="none" opacity="0.35" strokeLinecap="round" />
-      <path d="M100 28 L100 46" stroke="#1a0e09" strokeWidth="1.4" opacity="0.6" />
+      {/* hair swept back from the forehead (no bangs), glossy */}
+      <path d="M53 104 C49 60, 72 30, 100 29 C128 30, 151 60, 147 104 C145 88, 141 76, 133 68 C123 60, 111 57, 100 57 C89 57, 77 60, 67 68 C59 76, 55 88, 53 104 Z" fill={`url(#hr${id})`} />
+      <g fill="none" stroke="#7a5446" strokeWidth="2.2" strokeLinecap="round" opacity="0.35">
+        <path d="M74 66 C78 52, 88 42, 100 38" />
+        <path d="M126 66 C122 52, 112 42, 100 38" />
+      </g>
+
+      {/* sunglasses resting on top of the head */}
+      <g transform="rotate(-3 100 40)">
+        <rect x="66" y="33" width="29" height="15" rx="7" fill="#17151b" />
+        <rect x="105" y="33" width="29" height="15" rx="7" fill="#17151b" />
+        <path d="M95 39 Q100 36 105 39" stroke="#17151b" strokeWidth="3" fill="none" />
+        <path d="M70 37 L80 36" stroke="#fff" strokeWidth="1.6" opacity="0.5" strokeLinecap="round" />
+        <path d="M109 37 L119 36" stroke="#fff" strokeWidth="1.6" opacity="0.5" strokeLinecap="round" />
+        <path d="M66 40 L56 46 M134 40 L144 46" stroke="#17151b" strokeWidth="2.4" strokeLinecap="round" />
+      </g>
     </g>
   );
 }
@@ -331,8 +359,8 @@ function EylulMouth({ mood }: { mood: Mood }) {
   const up = mood === "calm" ? 2 : 5.5;
   return (
     <g>
-      <path d={`M${100 - w} ${131 - up} C${100 - w * 0.6} ${128.5 - up * 0.3}, 97 127, 100 128.4 C103 127, ${100 + w * 0.6} ${128.5 - up * 0.3}, ${100 + w} ${131 - up} Q100 135.6 ${100 - w} ${131 - up} Z`} fill="#d86a74" />
-      <path d={`M${100 - w + 2.5} ${132 - up * 0.7} C${100 - w * 0.5} 142.5, ${100 + w * 0.5} 142.5, ${100 + w - 2.5} ${132 - up * 0.7} Q100 136.2 ${100 - w + 2.5} ${132 - up * 0.7} Z`} fill="#ee8e93" />
+      <path d={`M${100 - w} ${131 - up} C${100 - w * 0.6} ${128.5 - up * 0.3}, 97 127, 100 128.4 C103 127, ${100 + w * 0.6} ${128.5 - up * 0.3}, ${100 + w} ${131 - up} Q100 135.6 ${100 - w} ${131 - up} Z`} fill="#cf7476" />
+      <path d={`M${100 - w + 2.5} ${132 - up * 0.7} C${100 - w * 0.5} 142.5, ${100 + w * 0.5} 142.5, ${100 + w - 2.5} ${132 - up * 0.7} Q100 136.2 ${100 - w + 2.5} ${132 - up * 0.7} Z`} fill="#e6999a" />
       <path d={`M${100 - w} ${131 - up} Q100 136.4 ${100 + w} ${131 - up}`} stroke="#9e3d4b" strokeWidth="1.6" fill="none" strokeLinecap="round" />
       <ellipse cx="100" cy="139" rx="5" ry="1.6" fill="#fff" opacity="0.45" />
     </g>
