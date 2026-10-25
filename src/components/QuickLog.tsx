@@ -37,7 +37,8 @@ async function downscale(file: File, max = 1024): Promise<string> {
 }
 
 export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne yedin? 😋" }: { onDone?: () => void; autoFocus?: boolean; date?: string; title?: string }) {
-  const { act } = useApp();
+  const { act, s } = useApp();
+  const presets = s.profile.presets ?? [];
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
@@ -165,6 +166,32 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
         </div>
       )}
 
+      {!items && presets.length > 0 && (
+        <div className="flex gap-2 mt-3 overflow-x-auto scroll-x relative">
+          {presets.map((p) => {
+            const k = p.items.reduce((a, i) => a + i.kcal, 0);
+            return (
+              <button
+                key={p.id}
+                className="shrink-0 rounded-2xl px-3.5 py-2.5 text-left press border-2"
+                style={{ borderColor: "var(--me)", background: "var(--me-soft)" }}
+                onClick={async () => {
+                  if (await act({ action: "logPreset", id: p.id, date, ...(date ? { meal: pastMeal } : {}) }, { toast: `${p.name} kaydedildi · ${k} kcal 😋`, celebrate: true })) onDone?.();
+                }}
+                aria-label={`${p.name} ekle, ${k} kcal`}
+              >
+                <span className="font-bold block leading-tight">
+                  {p.emoji} {p.name}
+                </span>
+                <span className="label num">
+                  {k.toLocaleString("tr-TR")} kcal · {Math.round(p.items.reduce((a, i) => a + i.protein, 0))} g protein · tek dokunuş
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {!items && (
         <>
           <form
@@ -289,6 +316,15 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
               </li>
             ))}
           </ul>
+          <button
+            className="label underline mt-3 block"
+            onClick={async () => {
+              const name = prompt("Bu menüye bir ad ver (örn. Pazar kahvaltısı)", "Menüm");
+              if (name) await act({ action: "savePreset", name, emoji: "⭐", meal: mealFor(), items: scaled.map(({ low: _l, ...x }) => x) }, { toast: "Tek dokunuşluk menü olarak kaydedildi ⭐" });
+            }}
+          >
+            ⭐ Bunu tek dokunuşluk menü olarak kaydet
+          </button>
           <div className="grid grid-cols-[auto_1fr] gap-2 mt-3">
             <button className="btn btn-ghost press" onClick={reset}>
               Vazgeç

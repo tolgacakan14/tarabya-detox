@@ -137,6 +137,36 @@ async function act(user: UserId, d: string, b: Body) {
       await setDaily(user, "bench", d, { ...prev, [bm.id]: v });
       return;
     }
+    case "logPreset": {
+      const { profile } = await getProfile(user);
+      const pr = (profile.presets ?? []).find((x) => x.id === b.id);
+      if (!pr) throw new Error("Menü bulunamadı");
+      const fd = pastDay(b.date, d);
+      for (const it of pr.items) {
+        const v = validFood({ ...it, meal: pr.meal });
+        await add<FoodEntry>(user, "food", fd, { name: v.name, amount: v.amount, kcal: Math.round(v.kcal), protein: v.protein, carbs: v.carbs, fat: v.fat, meal: typeof b.meal === "string" ? b.meal.slice(0, 40) : pr.meal, planned: false, time: fd === d ? nowTime() : undefined, source: "quick" });
+      }
+      return;
+    }
+    case "savePreset": {
+      const { profile } = await getProfile(user);
+      const items = (Array.isArray(b.items) ? b.items : []).slice(0, 15).map((x) => {
+        const v = validFood(x);
+        return { name: v.name, amount: v.amount ?? "", kcal: Math.round(v.kcal), protein: v.protein, carbs: v.carbs, fat: v.fat };
+      });
+      if (!items.length) throw new Error("Menü boş olamaz");
+      const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 40) : "Menüm";
+      const presets = (profile.presets ?? []).slice(0, 11);
+      const id = `p${Date.now().toString(36)}`;
+      presets.push({ id, name, emoji: typeof b.emoji === "string" ? [...b.emoji].slice(0, 2).join("") : "⭐", meal: typeof b.meal === "string" ? b.meal.slice(0, 40) : "kahvaltı", items });
+      await saveProfile(user, { ...profile, presets });
+      return;
+    }
+    case "deletePreset": {
+      const { profile } = await getProfile(user);
+      await saveProfile(user, { ...profile, presets: (profile.presets ?? []).filter((x) => x.id !== b.id) });
+      return;
+    }
     case "newDay": {
       await startNewDay(user);
       return;
