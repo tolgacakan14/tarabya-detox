@@ -368,6 +368,15 @@ export async function buildState(user: UserId) {
       weeksWon,
     },
     partnerPhase: pEng.phase,
+    partnerProgress: {
+      name: praw.profile.name,
+      goal: praw.profile.goal,
+      start: praw.profile.startWeight,
+      current: pEng.currentWeight,
+      target: praw.profile.targetWeight,
+      weeklyRate: pEng.weeklyRate,
+      weighIns: pEng.trend.length,
+    },
   };
 }
 

@@ -2,6 +2,50 @@
 import { useApp, Section, Bar } from "./ui";
 import Avatar, { moodFor } from "./Avatar";
 import { POINT_RULES } from "@/lib/state-constants";
+import CoupleMeter from "./CoupleMeter";
+import { useState } from "react";
+import { Check } from "./ui";
+
+function TodayTasks() {
+  const { s, act } = useApp();
+  const [todo, setTodo] = useState("");
+  return (
+    <Section title="Bugünün görevleri" aside={<span className="num font-bold text-grad">{s.todayScore.points} puan</span>}>
+      <ul className="space-y-1.5">
+        {s.todayScore.tasks.map((task) => {
+          const isTodo = task.id.startsWith("todo:");
+          return (
+            <li key={task.id} className="flex items-center gap-3 py-1">
+              <button
+                className="tick press"
+                data-on={task.done}
+                disabled={!isTodo}
+                aria-label={task.done ? "Tamamlandı" : "Tamamla"}
+                onClick={() => isTodo && act({ action: "toggleTodo", id: task.id.slice(5) }, task.done ? undefined : { toast: "Görev tamam", points: 10, celebrate: true })}
+              >
+                {task.done && <Check />}
+              </button>
+              <span className={`flex-1 ${task.done ? "line-through opacity-60" : ""}`}>{task.label}</span>
+              <span className="num text-sm font-semibold" style={{ color: task.earned ? "var(--me-ink)" : "var(--ink-3)" }}>
+                +{task.earned}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <form
+        className="flex gap-2 mt-3"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (todo.trim() && (await act({ action: "addTodo", text: todo }))) setTodo("");
+        }}
+      >
+        <input className="field" placeholder="Kendi görevini ekle" value={todo} onChange={(e) => setTodo(e.target.value)} />
+        <button className="btn">Ekle</button>
+      </form>
+    </Section>
+  );
+}
 
 export default function Race() {
   const { s } = useApp();
@@ -16,6 +60,10 @@ export default function Race() {
 
   return (
     <div className="grid lg:grid-cols-2 gap-4">
+      <div className="lg:col-span-2">
+        <CoupleMeter />
+      </div>
+      <TodayTasks />
       <Section title="Bu haftanın yarışı" aside={<span className="label">Pazartesi sıfırlanır</span>}>
         <ol className="space-y-4">
           {rows.map((r, i) => (
@@ -94,8 +142,9 @@ export default function Race() {
         )}
       </Section>
 
-      <Section title="Puan nasıl kazanılır?">
-        <ul className="divide-y text-sm" style={{ borderColor: "var(--line)" }}>
+      <details className="panel lg:col-span-2">
+        <summary className="display text-xl font-semibold cursor-pointer">Puan nasıl kazanılır?</summary>
+        <ul className="divide-y text-sm mt-3" style={{ borderColor: "var(--line)" }}>
           {POINT_RULES.map((r) => (
             <li key={r.what} className="flex justify-between gap-3 py-2">
               <span>{r.what}</span>
@@ -106,7 +155,7 @@ export default function Race() {
         <p className="text-sm mt-3" style={{ color: "var(--ink-2)" }}>
           Biriniz kilo alıyor, biriniz veriyor. Bu yüzden vücut puanı kilo farkından değil, kendi hedefinize sağlıklı hızda ilerlemenizden geliyor. Çok hızlı almak ya da vermek puan getirmez.
         </p>
-      </Section>
+      </details>
     </div>
   );
 }

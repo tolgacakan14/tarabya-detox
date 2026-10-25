@@ -10,15 +10,15 @@ import Coach from "./Coach";
 import Race from "./Race";
 import Progress from "./Progress";
 import Onboarding from "./Onboarding";
-import CoupleMeter from "./CoupleMeter";
+import { Confetti } from "./fx";
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "bugun", label: "Bugün" },
-  { id: "yemek", label: "Yemek" },
-  { id: "antrenman", label: "Spor" },
-  { id: "koc", label: "Koç" },
-  { id: "yaris", label: "Yarış" },
-  { id: "ilerleme", label: "İlerleme" },
+const TABS: { id: TabId; label: string; icon: string }[] = [
+  { id: "bugun", label: "Bugün", icon: "🏠" },
+  { id: "yemek", label: "Yemek", icon: "🍽️" },
+  { id: "antrenman", label: "Spor", icon: "💪" },
+  { id: "koc", label: "Koç", icon: "💬" },
+  { id: "yaris", label: "Yarış", icon: "🏆" },
+  { id: "ilerleme", label: "İlerleme", icon: "📈" },
 ];
 
 export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
@@ -27,6 +27,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
   const [tab, setTab] = useState<TabId>("bugun");
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [err, setErr] = useState("");
+  const [fire, setFire] = useState(0);
 
   const reload = useCallback(async () => {
     const r = await fetch("/api/state", { cache: "no-store" });
@@ -34,7 +35,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
       router.replace("/");
       return;
     }
-    setS(await r.json());
+    if (r.ok) setS(await r.json());
   }, [router]);
 
   useEffect(() => {
@@ -50,8 +51,10 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
     setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), 2600);
   }, []);
 
+  const celebrate = useCallback(() => setFire((f) => f + 1), []);
+
   const act = useCallback(
-    async (body: Record<string, unknown>, opts?: { toast?: string; points?: number }) => {
+    async (body: Record<string, unknown>, opts?: { toast?: string; points?: number; celebrate?: boolean }) => {
       setErr("");
       const r = await fetch("/api/act", { method: "POST", body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
@@ -60,66 +63,77 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
         return false;
       }
       if (opts?.toast) toast(opts.points ? `${opts.toast}  +${opts.points}` : opts.toast);
+      if (opts?.celebrate || (opts?.points ?? 0) >= 20) celebrate();
       await reload();
       return true;
     },
-    [reload, toast]
+    [reload, toast, celebrate]
   );
+
+  const go = useCallback((t: TabId) => {
+    setTab(t);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   if (!s) {
     return (
       <main data-user={user} className="min-h-dvh grid place-items-center">
-        <p className="display text-2xl" style={{ color: "var(--ink-2)" }}>Plan hazırlanıyor…</p>
+        <div className="blobs" aria-hidden>
+          <span />
+          <span />
+          <span />
+        </div>
+        <p className="display text-2xl font-bold text-grad">Plan hazırlanıyor…</p>
       </main>
     );
   }
 
   return (
-    <AppCtx.Provider value={{ s, act, reload, toast, go: setTab }}>
-      <div data-user={user} className="min-h-dvh pb-24 sm:pb-10">
-        <header className="max-w-6xl mx-auto px-4 pt-5 sm:pt-7">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="label">
-                {s.engine.week}. hafta, {s.habitDay}. gün
-              </p>
-              <h1 className="display text-3xl sm:text-4xl font-bold leading-tight">Selam {s.profile.name}</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="chip num" title="Toplam puan">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: "var(--me)" }} />
-                {s.scores.me.total.toLocaleString("tr-TR")} puan
-              </span>
-              <button
-                className="chip"
-                onClick={async () => {
-                  await fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "logout" }) });
-                  router.replace("/");
-                }}
-              >
-                Profil değiştir
-              </button>
-            </div>
+    <AppCtx.Provider value={{ s, act, reload, toast, celebrate, go }}>
+      <div data-user={user} className="min-h-dvh pb-28 sm:pb-10">
+        <div className="blobs" aria-hidden>
+          <span />
+          <span />
+          <span />
+        </div>
+        <header className="relative z-10 max-w-6xl mx-auto px-4 pt-5 sm:pt-7 flex items-center justify-between gap-3">
+          <h1 className="display text-3xl sm:text-4xl font-bold leading-tight">
+            Selam <span className="text-grad">{s.profile.name}</span>
+          </h1>
+          <div className="flex items-center gap-2">
+            <span className="chip num font-semibold" title="Toplam puan">
+              ⭐ {s.scores.me.total.toLocaleString("tr-TR")}
+            </span>
+            <button
+              className="chip"
+              onClick={async () => {
+                await fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "logout" }) });
+                router.replace("/");
+              }}
+              aria-label="Profil değiştir"
+            >
+              ⇄
+            </button>
           </div>
-          <CoupleMeter />
-          <nav className="hidden sm:flex gap-1 mt-5" aria-label="Bölümler">
-            {TABS.map((t) => (
-              <button key={t.id} className="chip" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
         </header>
+
+        <nav className="relative z-10 hidden sm:flex gap-1.5 max-w-6xl mx-auto px-4 mt-4" aria-label="Bölümler">
+          {TABS.map((t) => (
+            <button key={t.id} className="chip press" aria-pressed={tab === t.id} onClick={() => go(t.id)}>
+              <span aria-hidden>{t.icon}</span> {t.label}
+            </button>
+          ))}
+        </nav>
 
         {err && (
           <div className="max-w-6xl mx-auto px-4 mt-3">
-            <p className="panel" role="alert" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+            <p className="panel !py-3" role="alert" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
               {err}
             </p>
           </div>
         )}
 
-        <main className="max-w-6xl mx-auto px-4 mt-4">
+        <main className="relative z-10 max-w-6xl mx-auto px-4 mt-4">
           {tab === "bugun" && <Today />}
           {tab === "yemek" && <Food />}
           {tab === "antrenman" && <Workout />}
@@ -129,29 +143,35 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
         </main>
 
         <nav
-          className="sm:hidden fixed bottom-0 inset-x-0 grid grid-cols-6 border-t"
-          style={{ background: "var(--paper)", borderColor: "var(--line)", paddingBottom: "env(safe-area-inset-bottom)" }}
+          className="sm:hidden fixed bottom-3 inset-x-3 grid grid-cols-6 rounded-3xl shadow-xl z-40"
+          style={{ background: "var(--paper)", paddingBottom: "env(safe-area-inset-bottom)" }}
           aria-label="Bölümler"
         >
           {TABS.map((t) => (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
-              className="py-3 text-[13px] font-semibold"
-              style={{ color: tab === t.id ? "var(--me-ink)" : "var(--ink-3)", borderTop: tab === t.id ? "3px solid var(--me)" : "3px solid transparent" }}
+              onClick={() => go(t.id)}
+              className="py-2 flex flex-col items-center gap-0.5 press"
+              aria-current={tab === t.id ? "page" : undefined}
             >
-              {t.label}
+              <span className={`text-xl leading-none transition-transform ${tab === t.id ? "scale-125" : "opacity-60"}`} aria-hidden>
+                {t.icon}
+              </span>
+              <span className="text-[11px] font-semibold" style={{ color: tab === t.id ? "var(--me-ink)" : "var(--ink-3)" }}>
+                {t.label}
+              </span>
             </button>
           ))}
         </nav>
 
         <div className="fixed top-4 inset-x-0 flex flex-col items-center gap-2 pointer-events-none z-50" aria-live="polite">
           {toasts.map((t) => (
-            <div key={t.id} className="pop rounded-full px-4 py-2 font-semibold shadow-lg" style={{ background: "var(--ink)", color: "var(--paper)" }}>
+            <div key={t.id} className="pop rounded-full px-5 py-2.5 font-bold shadow-lg grad-me text-white">
               {t.text}
             </div>
           ))}
         </div>
+        <Confetti fire={fire} />
 
         {!s.profile.onboarded && <Onboarding />}
       </div>

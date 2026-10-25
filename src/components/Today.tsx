@@ -1,240 +1,297 @@
 "use client";
+// Home: deliberately simple. Where am I (kg + progress bar), today's three rings, and the one next thing to do.
 import { useState } from "react";
-import { useApp, Bar, Section, Stat, fmt, Check } from "./ui";
-import { GAP_FILLERS, PROTEIN_FILLERS } from "@/lib/meals";
+import { useApp, fmt, kg } from "./ui";
+import Avatar, { moodFor } from "./Avatar";
+import { Ring } from "./fx";
+import { useMenu } from "./useMenu";
+import { nextQuestions } from "@/lib/menu";
 import { WATER_TARGET } from "@/lib/state-constants";
+import { FOODS } from "@/lib/foods";
 
-const REACTIONS = [
-  { type: "highfive", label: "Beşlik çak", emoji: "🙌" },
-  { type: "cheer", label: "Tezahürat", emoji: "📣" },
-  { type: "proud", label: "Gurur duyuyorum", emoji: "💛" },
-  { type: "walk", label: "Sahile yürüyüşe gel", emoji: "🌊" },
-];
-const REACTION_TEXT: Record<string, string> = {
-  highfive: "beşlik çaktı",
-  cheer: "sana tezahürat yapıyor",
-  proud: "seninle gurur duyuyor",
-  walk: "seni sahile yürüyüşe çağırıyor",
-};
+function statusLine(goal: "gain" | "lose", rate: number | null, phase: string, weighIns: number, w: number) {
+  if (weighIns < 4 || rate === null) return "Birkaç sabah tartıl, hızını hesaplayayım.";
+  if (phase === "maintenance") return "Bakım dönemindesin, kilonu koruyorsun.";
+  if (goal === "gain") {
+    if (rate > 0.5) return "Hızlı alıyorsun, biraz yavaşlatalım.";
+    if (rate >= 0.12) return "Sağlıklı hızda alıyorsun. Böyle devam!";
+    if (rate > 0) return "Doğru yöndesin ama yavaş. Bir shake ekle.";
+    return "Bu ara yerinde sayıyor. Öğünleri atlamayalım.";
+  }
+  if (rate < -0.007 * w) return "Çok hızlı veriyorsun, kalorini biraz artırdım.";
+  if (rate <= -0.1) return "Sağlıklı hızda veriyorsun. Harika gidiyor!";
+  if (rate < 0) return "Yavaş ama doğru yöndesin. Tartı dalgalanır, trende bak.";
+  return "Bu hafta yerinde. Adımları biraz artıralım.";
+}
 
 export default function Today() {
-  const { s, act, go } = useApp();
-  const t = s.engine.targets;
-  const gain = s.profile.goal === "gain";
-  const [weight, setWeight] = useState("");
-  const [steps, setSteps] = useState("");
-  const [sleep, setSleep] = useState("");
-  const [todo, setTodo] = useState("");
-  const hour = new Date().getHours();
-  const kcalLeft = t.kcal - s.totals.kcal;
-  const proteinLeft = t.protein - s.totals.protein;
-
-  const fillers = gain ? GAP_FILLERS : PROTEIN_FILLERS;
-  const showFiller = gain ? hour >= 17 && kcalLeft > 300 : hour >= 15 && proteinLeft > 20;
-
+  const { s } = useApp();
   return (
-    <div className="grid lg:grid-cols-[1.4fr_1fr] gap-4">
+    <div className="grid lg:grid-cols-[1.25fr_1fr] gap-4 items-start">
       <div className="space-y-4">
-        {s.engine.insights.length > 0 && (
-          <div className="space-y-2">
-            {s.engine.insights.map((i, k) => (
-              <p
-                key={k}
-                className="panel !py-3"
-                style={{
-                  background: i.tone === "warn" ? "var(--warn-soft)" : i.tone === "good" ? "var(--me-soft)" : "var(--paper)",
-                  color: i.tone === "warn" ? "var(--warn)" : "var(--ink)",
-                }}
-              >
-                {i.text}
-              </p>
-            ))}
-          </div>
-        )}
-
-        <Section title="Bugünkü hedefler" aside={<span className="label">{s.engine.phase === "maintenance" ? "Bakım dönemi" : gain ? "Fazla dönemi" : "Açık dönemi"}</span>}>
-          <div className="grid grid-cols-2 gap-5">
-            <div>
-              <Stat value={fmt(s.totals.kcal)} unit={`/ ${fmt(t.kcal)}`} label="kcal" />
-              <div className="mt-2">
-                <Bar value={s.totals.kcal} max={t.kcal} label="Kalori" />
-              </div>
-            </div>
-            <div>
-              <Stat value={fmt(s.totals.protein)} unit={`/ ${t.protein} g`} label="protein" />
-              <div className="mt-2">
-                <Bar value={s.totals.protein} max={t.protein} label="Protein" />
-              </div>
-            </div>
-          </div>
-          <p className="text-sm mt-4" style={{ color: "var(--ink-2)" }}>
-            {gain
-              ? kcalLeft > 0
-                ? `Hedefe ${fmt(kcalLeft)} kcal kaldı. Eksik kalmak, fazla yemekten daha büyük sorun.`
-                : "Bugünün kalorisi tamam. Harika."
-              : kcalLeft >= 0
-                ? `${fmt(kcalLeft)} kcal alanın var. Önce proteini tamamla.`
-                : "Bugün biraz fazla oldu, sorun değil. Haftalık ortalamaya bakıyoruz, telafi etmeye çalışma."}
-          </p>
-          <button className="btn btn-me mt-4" onClick={() => go("yemek")}>
-            Yemek ekle
-          </button>
-        </Section>
-
-        {showFiller && (
-          <Section title={gain ? "Açığı kapat" : "Proteini tamamla"}>
-            <p className="text-sm mb-3" style={{ color: "var(--ink-2)" }}>
-              {gain ? `${fmt(kcalLeft)} kcal eksik. Tek dokunuşla ekle:` : `${fmt(proteinLeft)} g protein eksik. Hafif seçenekler:`}
-            </p>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {fillers.map((f) => (
-                <button
-                  key={f.text}
-                  className="chip justify-between !rounded-xl !py-3"
-                  onClick={async () => {
-                    for (const it of f.items) await act({ action: "addFood", foodId: it.id, qty: it.qty, planned: true });
-                  }}
-                >
-                  <span className="text-left">{f.text}</span>
-                  <span className="num label">{f.kcal} kcal</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        <Section title="Görevler" aside={<span className="num label">{s.todayScore.points} puan bugün</span>}>
-          <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
-            {s.todayScore.tasks.map((task) => {
-              const isTodo = task.id.startsWith("todo:");
-              return (
-                <li key={task.id} className="flex items-center gap-3 py-2.5">
-                  <button
-                    className="tick"
-                    data-on={task.done}
-                    disabled={!isTodo}
-                    aria-label={task.done ? "Tamamlandı" : "Tamamla"}
-                    onClick={() => isTodo && act({ action: "toggleTodo", id: task.id.slice(5) }, task.done ? undefined : { toast: "Görev tamam", points: 10 })}
-                  >
-                    {task.done && <Check />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={task.done ? "line-through opacity-60" : ""}>{task.label}</p>
-                    {task.hint && <p className="label">{task.hint}</p>}
-                  </div>
-                  <span className="num text-sm" style={{ color: task.earned ? "var(--me-ink)" : "var(--ink-3)" }}>
-                    {task.earned}/{task.points}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <form
-            className="flex gap-2 mt-3"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!todo.trim()) return;
-              if (await act({ action: "addTodo", text: todo })) setTodo("");
-            }}
-          >
-            <input className="field" placeholder="Kendi görevini ekle" value={todo} onChange={(e) => setTodo(e.target.value)} />
-            <button className="btn">Ekle</button>
-          </form>
-        </Section>
+        <ProgressHero />
+        <RingsCard />
       </div>
-
       <div className="space-y-4">
-        <Section title="Su" aside={<span className="num label">{s.water} / {WATER_TARGET} bardak</span>}>
-          <div className="flex flex-wrap gap-1.5">
-            {Array.from({ length: Math.max(WATER_TARGET, s.water) }).map((_, i) => (
-              <span
-                key={i}
-                className={`w-8 h-10 rounded-b-xl rounded-t-sm border-2 ${i < s.water ? "pop" : ""}`}
-                style={{ borderColor: "var(--me)", background: i < s.water ? "var(--me)" : "transparent" }}
-                aria-hidden
-              />
-            ))}
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button className="btn btn-me flex-1" onClick={() => act({ action: "water", delta: 1 }, { toast: "Bir bardak su", points: s.water < WATER_TARGET ? 5 : 0 })}>
-              + 1 bardak
-            </button>
-            <button className="btn btn-ghost" onClick={() => act({ action: "water", delta: -1 })} disabled={!s.water}>
-              Geri al
-            </button>
-          </div>
-        </Section>
-
-        <Section title="Bugünün ölçümleri">
-          <div className="grid grid-cols-3 gap-2">
-            <MiniInput label="Kilo (kg)" value={weight} set={setWeight} current={s.weighedToday} onSave={() => act({ action: "weight", kg: Number(weight.replace(",", ".")) }, { toast: "Tartı kaydedildi", points: 10 }).then((ok) => ok && setWeight(""))} />
-            <MiniInput label="Adım" value={steps} set={setSteps} current={s.steps || undefined} onSave={() => act({ action: "steps", steps: Number(steps) }, { toast: "Adımlar kaydedildi" }).then((ok) => ok && setSteps(""))} />
-            <MiniInput label="Uyku (saat)" value={sleep} set={setSleep} current={s.sleep} onSave={() => act({ action: "sleep", hours: Number(sleep.replace(",", ".")) }, { toast: "Uyku kaydedildi" }).then((ok) => ok && setSleep(""))} />
-          </div>
-          <div className="mt-3">
-            <div className="flex justify-between label">
-              <span>Adım hedefi</span>
-              <span className="num">{fmt(s.steps)} / {fmt(t.steps)}</span>
-            </div>
-            <Bar value={s.steps} max={t.steps} height={8} label="Adım" />
-          </div>
-        </Section>
-
-        <Section title={s.plan.training ? s.plan.session.title : "Dinlenme günü"}>
-          <p style={{ color: "var(--ink-2)" }}>
-            {s.plan.training
-              ? `Bu hafta ${s.plan.sessionsDoneThisWeek}/${t.sessionsPerWeek} antrenman. ${s.plan.session.exercises.length} hareket, yaklaşık ${s.profile.goal === "gain" ? 45 : 30} dakika.`
-              : `${s.plan.cardio.title}: ${s.plan.cardio.detail}`}
+        <NextUp />
+        <PartnerStrip />
+        {s.engine.insights.filter((i) => i.tone === "warn").map((i, k) => (
+          <p key={k} className="panel !py-3 text-sm" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+            {i.text}
           </p>
-          <button className="btn btn-me mt-3" onClick={() => go("antrenman")}>
-            {s.plan.training ? "Antrenmana başla" : "Yürüyüşü kaydet"}
-          </button>
-        </Section>
-
-        <Section title={s.scores.partner.name}>
-          <p className="text-sm" style={{ color: "var(--ink-2)" }}>
-            Bugün {s.scores.partner.todayTasks.filter((x) => x.done).length}/{s.scores.partner.todayTasks.length} görev tamam.
-          </p>
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            {REACTIONS.map((r) => (
-              <button key={r.type} className="chip !rounded-xl !py-2.5 justify-center" onClick={() => act({ action: "react", type: r.type }, { toast: "Gönderildi" })}>
-                <span aria-hidden>{r.emoji}</span> {r.label}
-              </button>
-            ))}
-          </div>
-          {s.reactions.length > 0 && (
-            <ul className="mt-4 space-y-1.5">
-              {s.reactions.slice(0, 4).map((r) => (
-                <li key={r.id} className="text-sm">
-                  <span className="font-semibold">{s.scores.partner.name}</span> {REACTION_TEXT[r.type] ?? "bir şey gönderdi"}
-                  <span className="label ml-2">{r.date === s.today ? "bugün" : r.date}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <p className="label px-2">
-          Alışkanlık sayacı: {s.habitDay}. gün / ~66. Bir günü kaçırmak süreci bozmaz.
-        </p>
+        ))}
       </div>
     </div>
   );
 }
 
-function MiniInput({ label, value, set, current, onSave }: { label: string; value: string; set: (v: string) => void; current?: number; onSave: () => void }) {
+function progressOf(goal: "gain" | "lose", start: number, current: number, target: number) {
+  const change = current - start;
+  const total = target - start;
+  const pct = total === 0 ? 0 : Math.max(0, Math.min(1, change / total));
+  const left = Math.max(0, goal === "gain" ? target - current : current - target);
+  return { change, pct, left };
+}
+
+function ProgressHero() {
+  const { s } = useApp();
+  const p = s.profile;
+  const e = s.engine;
+  const { change, pct, left } = progressOf(p.goal, p.startWeight, e.currentWeight, p.targetWeight);
+  const gain = p.goal === "gain";
+  const good = gain ? change >= 0 : change <= 0;
+  const sign = change > 0 ? "+" : change < 0 ? "−" : "";
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (value) onSave();
-      }}
-    >
-      <label className="label block mb-1">{label}</label>
-      <input className="field num" inputMode="decimal" value={value} placeholder={current !== undefined ? String(current) : "—"} onChange={(e) => set(e.target.value)} />
-      <button className="btn btn-ghost w-full mt-1.5 !py-1.5 text-sm" disabled={!value}>
-        Kaydet
+    <section className="panel !p-5 sm:!p-7 relative overflow-hidden">
+      <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full grad-me opacity-15" aria-hidden />
+      <div className="flex items-center gap-4">
+        <Avatar who={s.user} mood={moodFor(s.todayScore.completion)} level={s.scores.me.level.index} size={104} />
+        <div>
+          <p className="label">{gain ? "Aldığın kilo" : "Verdiğin kilo"}</p>
+          <p className={`display font-bold leading-none num text-6xl sm:text-7xl ${good ? "text-grad" : ""}`}>
+            {sign}
+            {kg(Math.abs(change))}
+            <span className="text-2xl font-semibold ml-1" style={{ color: "var(--ink-2)" }}>kg</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <div className="relative h-6 rounded-full overflow-hidden" style={{ background: "var(--line)" }}>
+          <div className="h-full rounded-full grad-me shine transition-[width] duration-1000" style={{ width: `${Math.max(4, pct * 100)}%` }} />
+        </div>
+        <div className="flex justify-between mt-2 text-sm num" style={{ color: "var(--ink-2)" }}>
+          <span>{kg(p.startWeight)} kg</span>
+          <span className="font-semibold" style={{ color: "var(--ink)" }}>
+            Şimdi {kg(e.currentWeight)} kg
+          </span>
+          <span>Hedef {kg(p.targetWeight)} kg</span>
+        </div>
+      </div>
+
+      <p className="mt-4 text-lg font-semibold">
+        {left > 0 ? `Hedefe ${kg(left)} kg kaldı.` : "Hedefe ulaştın! 🎉"}{" "}
+        <span className="font-normal" style={{ color: "var(--ink-2)" }}>
+          {statusLine(p.goal, e.weeklyRate, e.phase, e.trend.length, e.currentWeight)}
+        </span>
+      </p>
+    </section>
+  );
+}
+
+function RingsCard() {
+  const { s, act } = useApp();
+  const t = s.engine.targets;
+  return (
+    <section className="panel">
+      <div className="grid grid-cols-3 gap-2 justify-items-center">
+        <div className="text-center">
+          <Ring value={s.totals.kcal} max={t.kcal} colors={["#ff8a00", "#ff4d6d"]} label="Kalori">
+            <div>
+              <p className="display font-bold text-xl num leading-none">{fmt(s.totals.kcal)}</p>
+              <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {fmt(t.kcal)}</p>
+            </div>
+          </Ring>
+          <p className="text-sm font-semibold mt-1">Kalori</p>
+        </div>
+        <div className="text-center">
+          <Ring value={s.totals.protein} max={t.protein} colors={["#8b5cf6", "#3a86ff"]} label="Protein">
+            <div>
+              <p className="display font-bold text-xl num leading-none">{fmt(s.totals.protein)}</p>
+              <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {t.protein} g</p>
+            </div>
+          </Ring>
+          <p className="text-sm font-semibold mt-1">Protein</p>
+        </div>
+        <button
+          className="text-center press"
+          onClick={() => act({ action: "water", delta: 1 }, { toast: "💧 Bir bardak su", points: s.water < WATER_TARGET ? 5 : 0, celebrate: s.water + 1 === WATER_TARGET })}
+          aria-label="Bir bardak su ekle"
+        >
+          <Ring value={s.water} max={WATER_TARGET} colors={["#4cc9f0", "#10b5a3"]} label="Su">
+            <div>
+              <p className="display font-bold text-xl num leading-none">{s.water}</p>
+              <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {WATER_TARGET} 💧</p>
+            </div>
+          </Ring>
+          <p className="text-sm font-semibold mt-1">Su +1</p>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function NextUp() {
+  const { s, act, go } = useApp();
+  const { menu, prefs, eaten } = useMenu(s);
+  const hour = new Date().getHours();
+  const [w, setW] = useState<number>(s.weighedToday ?? s.lastWeight ?? s.profile.startWeight);
+  const asks = nextQuestions(prefs, 1);
+
+  // which meal is next by clock, skipping eaten ones
+  const order = menu.meals
+    .map((m, i) => ({ m, i }))
+    .filter(({ i }) => !eaten(i));
+  const bySlotHour = (slot: string) => (slot === "kahvaltı" ? 7 : slot === "öğle" ? 12 : slot === "akşam" ? 19 : 16);
+  const next = order.sort((a, b) => Math.abs(bySlotHour(a.m.slot) - hour) - Math.abs(bySlotHour(b.m.slot) - hour))[0];
+  const workoutDone = s.workoutsToday.some((x) => x.type === "strength" || x.type === "mini");
+
+  return (
+    <>
+      {s.weighedToday === undefined && (
+        <section className="panel">
+          <p className="display text-xl font-bold">Günaydın tartısı ⚖️</p>
+          <div className="flex items-center gap-3 mt-3">
+            <button className="btn btn-ghost !w-12 !h-12 !p-0 text-2xl press" onClick={() => setW((x) => Math.round((x - 0.1) * 10) / 10)} aria-label="0,1 kg azalt">
+              −
+            </button>
+            <p className="display text-4xl font-bold num flex-1 text-center">{kg(w)}</p>
+            <button className="btn btn-ghost !w-12 !h-12 !p-0 text-2xl press" onClick={() => setW((x) => Math.round((x + 0.1) * 10) / 10)} aria-label="0,1 kg artır">
+              +
+            </button>
+          </div>
+          <button className="btn btn-me w-full mt-3 press" onClick={() => act({ action: "weight", kg: w }, { toast: "Tartı kaydedildi", points: 10 })}>
+            Kaydet
+          </button>
+        </section>
+      )}
+
+      {next && (
+        <section className="panel">
+          <div className="flex items-baseline justify-between">
+            <p className="display text-xl font-bold capitalize">Sıradaki: {next.m.slot}</p>
+            <span className="label num">{next.m.kcal} kcal</span>
+          </div>
+          <p className="mt-1 text-lg">{next.m.items.map((i) => (i.qty !== 1 ? `${i.qty}× ` : "") + i.name).join(" + ")}</p>
+          <div className="flex gap-2 mt-3">
+            <button
+              className="btn btn-me flex-1 press"
+              onClick={async () => {
+                for (let k = 0; k < next.m.items.length; k++) {
+                  const it = next.m.items[k];
+                  const last = k === next.m.items.length - 1;
+                  await act({ action: "addFood", foodId: it.foodId, qty: it.qty, meal: next.m.slot, planned: true }, last ? { toast: "Afiyet olsun 😋", celebrate: true } : undefined);
+                }
+              }}
+            >
+              Yedim ✓
+            </button>
+            <button className="btn btn-ghost press" onClick={() => go("yemek")}>
+              Değiştir
+            </button>
+          </div>
+        </section>
+      )}
+
+      {s.plan.training && !workoutDone && (
+        <button className="panel w-full text-left press flex items-center gap-4" onClick={() => go("antrenman")}>
+          <span className="text-4xl" aria-hidden>
+            🏋️
+          </span>
+          <span>
+            <span className="display text-xl font-bold block">Bugün antrenman var</span>
+            <span style={{ color: "var(--ink-2)" }}>{s.plan.session.title}, ~{s.profile.goal === "gain" ? 45 : 30} dk. Dokun, başla.</span>
+          </span>
+        </button>
+      )}
+
+      {asks[0] && <AskFood foodId={asks[0].id} />}
+
+      <button className="panel w-full text-left press flex items-center justify-between" onClick={() => go("yaris")}>
+        <span>
+          <span className="display text-lg font-bold">Bugün {s.todayScore.points} puan</span>
+          <span className="block text-sm" style={{ color: "var(--ink-2)" }}>
+            {s.todayScore.tasks.filter((x) => x.done).length}/{s.todayScore.tasks.length} görev tamam
+          </span>
+        </span>
+        <span className="text-2xl" aria-hidden>
+          🏆
+        </span>
       </button>
-    </form>
+    </>
+  );
+}
+
+function AskFood({ foodId }: { foodId: string }) {
+  const { act } = useApp();
+  const f = FOODS.find((x) => x.id === foodId)!;
+  return (
+    <section className="panel">
+      <p className="label">Seni tanıyayım</p>
+      <p className="display text-2xl font-bold mt-1">{f.name} yer misin?</p>
+      <div className="grid grid-cols-3 gap-2 mt-3">
+        <button className="btn btn-ghost press !px-2" onClick={() => act({ action: "foodPref", foodId, value: -1 })}>
+          Yemem 🙅
+        </button>
+        <button className="btn btn-ghost press !px-2" onClick={() => act({ action: "foodPref", foodId, value: 1 })}>
+          Yerim 🙂
+        </button>
+        <button className="btn btn-me press !px-2" onClick={() => act({ action: "foodPref", foodId, value: 2 })}>
+          Bayılırım 😍
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function PartnerStrip() {
+  const { s, act } = useApp();
+  const pp = s.partnerProgress;
+  const pid = s.user === "tolga" ? "eylul" : "tolga";
+  const { change, pct } = progressOf(pp.goal, pp.start, pp.current, pp.target);
+  const sign = change > 0 ? "+" : change < 0 ? "−" : "";
+  const done = s.scores.partner.todayTasks.filter((x) => x.done).length / Math.max(1, s.scores.partner.todayTasks.length);
+  return (
+    <section className="panel" data-user={pid}>
+      <div className="flex items-center gap-3">
+        <Avatar who={pid} mood={moodFor(done)} level={s.scores.partner.level.index} size={60} bob={false} />
+        <div className="flex-1">
+          <div className="flex items-baseline justify-between">
+            <p className="display text-lg font-bold">{pp.name}</p>
+            <p className="display font-bold num">
+              {sign}
+              {kg(Math.abs(change))} kg
+            </p>
+          </div>
+          <div className="h-3 rounded-full overflow-hidden mt-1.5" style={{ background: "var(--line)" }}>
+            <div className="h-full rounded-full grad-me" style={{ width: `${Math.max(4, pct * 100)}%` }} />
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-3">
+        <button className="btn btn-ghost flex-1 press !px-2" onClick={() => act({ action: "react", type: "highfive" }, { toast: "🙌 Beşlik gönderildi" })}>
+          🙌 Beşlik
+        </button>
+        <button className="btn btn-ghost flex-1 press !px-2" onClick={() => act({ action: "react", type: "walk" }, { toast: "🌊 Davet gönderildi" })}>
+          🌊 Yürüyüşe gel
+        </button>
+      </div>
+      {s.reactions[0] && s.reactions[0].date === s.today && (
+        <p className="text-sm mt-2" style={{ color: "var(--ink-2)" }}>
+          {pp.name}: {{ highfive: "sana beşlik çaktı 🙌", cheer: "tezahürat yapıyor 📣", proud: "seninle gurur duyuyor 💛", walk: "seni sahile çağırıyor 🌊" }[s.reactions[0].type] ?? "bir şey gönderdi"}
+        </p>
+      )}
+    </section>
   );
 }

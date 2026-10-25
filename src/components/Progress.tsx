@@ -121,7 +121,7 @@ export default function Progress() {
           </p>
         </Section>
 
-        <Section title="Kişisel bilgiler">
+        <details className="panel"><summary className="display text-xl font-semibold cursor-pointer">⚙️ Bilgilerimi düzenle</summary><div className="mt-3">
           <form
             className="space-y-2"
             onSubmit={async (ev) => {
@@ -158,7 +158,7 @@ export default function Progress() {
             </label>
             <button className="btn btn-me w-full">Kaydet</button>
           </form>
-        </Section>
+        </div></details>
 
         {!gain && (
           <Section title="Kendini nasıl hissediyorsun?">

@@ -2,65 +2,147 @@
 import { useMemo, useState } from "react";
 import { useApp, Bar, Section, fmt } from "./ui";
 import { FOODS, QUICK_SIZES, searchFoods } from "@/lib/foods";
-import { MEAL_PLANS, mealTotals } from "@/lib/meals";
+import { useMenu } from "./useMenu";
+import { nextQuestions } from "@/lib/menu";
 
 type Item = { name: string; amount: string; kcal: number; protein: number; carbs: number; fat: number };
-type Mode = "plan" | "list" | "ai" | "quick" | "manual";
+type Mode = "list" | "quick" | "manual";
+
+const SLOT_ICON: Record<string, string> = { kahvaltı: "🍳", öğle: "🍲", akşam: "🍽️", "ara öğün": "🍌" };
 
 export default function Food() {
   const { s, act } = useApp();
   const t = s.engine.targets;
   const gain = s.profile.goal === "gain";
-  const [mode, setMode] = useState<Mode>("plan");
-  const dayIdx = s.habitDay % MEAL_PLANS[s.user].length;
-  const plan = MEAL_PLANS[s.user][dayIdx];
-
-  const weekAvg = s.engine.weekBudget.days ? s.engine.weekBudget.used / s.engine.weekBudget.days : 0;
+  const { menu, prefs, reroll, eaten } = useMenu(s);
+  const [more, setMore] = useState<Mode | null>(null);
+  const asks = nextQuestions(prefs, 3);
 
   return (
-    <div className="grid lg:grid-cols-[1fr_1.2fr] gap-4">
+    <div className="grid lg:grid-cols-[1.3fr_1fr] gap-4 items-start">
       <div className="space-y-4">
-        <Section title="Bugün">
-          <div className="space-y-3">
-            {[
-              { k: "Kalori", v: s.totals.kcal, m: t.kcal, u: "kcal" },
-              { k: "Protein", v: s.totals.protein, m: t.protein, u: "g" },
-              { k: "Karbonhidrat", v: s.totals.carbs, m: t.carbs, u: "g" },
-              { k: "Yağ", v: s.totals.fat, m: t.fat, u: "g" },
-            ].map((r) => (
-              <div key={r.k}>
-                <div className="flex justify-between text-sm">
-                  <span>{r.k}</span>
-                  <span className="num" style={{ color: "var(--ink-2)" }}>
-                    {fmt(r.v)} / {fmt(r.m)} {r.u}
-                  </span>
-                </div>
-                <Bar value={r.v} max={r.m} height={8} label={r.k} />
-              </div>
-            ))}
+        <section className="panel">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="display text-2xl font-bold">Senin menün</h2>
+            <span className="label num">
+              {fmt(menu.kcal)} kcal · {menu.protein} g protein
+            </span>
           </div>
-          <p className="text-sm mt-4" style={{ color: "var(--ink-2)" }}>
-            Bu hafta günlük ortalaman {fmt(weekAvg)} kcal (hedef {fmt(t.kcal)}). Tek bir gün değil, haftanın ortalaması önemli.
-          </p>
-        </Section>
-
-        <Section title="Yediklerim">
-          {s.foods.length === 0 ? (
-            <p style={{ color: "var(--ink-2)" }}>Henüz kayıt yok. Plandan bir öğün seç ya da plansız yediğini yaz.</p>
-          ) : (
-            <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
-              {s.foods.map((f) => (
-                <li key={f.id} className="py-2.5 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold">{f.name}</p>
-                    <p className="label">
-                      {[f.time, f.amount, f.meal, f.planned ? "planlı" : "plansız"].filter(Boolean).join(", ")}
+          {menu.note && (
+            <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>
+              {menu.note}
+            </p>
+          )}
+          <ul className="mt-3 space-y-2.5">
+            {menu.meals.map((m, idx) => {
+              const done = eaten(idx);
+              return (
+                <li key={idx} className="rounded-2xl p-3 border-2 transition-colors" style={{ borderColor: done ? "var(--me)" : "var(--line)", background: done ? "var(--me-soft)" : "transparent" }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-bold capitalize">
+                      <span aria-hidden>{SLOT_ICON[m.slot]}</span> {m.slot}
                     </p>
+                    <span className="label num">{m.kcal} kcal</span>
                   </div>
-                  <div className="text-right num text-sm">
-                    <p>{f.kcal} kcal</p>
-                    <p className="label">{f.protein} g protein</p>
+                  <ul className="mt-1.5 space-y-1">
+                    {m.items.map((it) => (
+                      <li key={it.foodId} className="flex items-center gap-2">
+                        <span className="flex-1">
+                          {it.qty !== 1 && <b className="num">{it.qty}× </b>}
+                          {it.name}
+                          <span className="label"> ({it.portion})</span>
+                        </span>
+                        {it.isNew && !done && (
+                          <span className="flex gap-1">
+                            <button className="chip !px-2 !py-0.5 press" aria-label={`${it.name} yerim`} onClick={() => act({ action: "foodPref", foodId: it.foodId, value: 1 })}>
+                              👍
+                            </button>
+                            <button className="chip !px-2 !py-0.5 press" aria-label={`${it.name} yemem`} onClick={() => act({ action: "foodPref", foodId: it.foodId, value: -1 })}>
+                              👎
+                            </button>
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-2 mt-2.5">
+                    <button
+                      className={`btn ${done ? "btn-ghost" : "btn-me"} flex-1 press !py-2`}
+                      onClick={async () => {
+                        for (let k = 0; k < m.items.length; k++) {
+                          const it = m.items[k];
+                          await act({ action: "addFood", foodId: it.foodId, qty: it.qty, meal: m.slot, planned: true }, k === m.items.length - 1 ? { toast: "Afiyet olsun 😋", celebrate: true } : undefined);
+                        }
+                      }}
+                    >
+                      {done ? "Yine yedim" : "Yedim ✓"}
+                    </button>
+                    {!done && (
+                      <button className="btn btn-ghost press !py-2" onClick={() => reroll(idx)} aria-label={`${m.slot} için başka öneri`}>
+                        🔄 Değiştir
+                      </button>
+                    )}
                   </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        {asks.length > 0 && (
+          <section className="panel">
+            <h2 className="display text-xl font-bold">Bunları yer misin?</h2>
+            <p className="text-sm" style={{ color: "var(--ink-2)" }}>Cevapladıkça menün sadece sevdiklerinden oluşur.</p>
+            <ul className="mt-2 space-y-2">
+              {asks.map((f) => (
+                <li key={f.id} className="flex items-center gap-2">
+                  <span className="flex-1 font-semibold">{f.name}</span>
+                  <button className="chip press" onClick={() => act({ action: "foodPref", foodId: f.id, value: -1 })}>🙅</button>
+                  <button className="chip press" onClick={() => act({ action: "foodPref", foodId: f.id, value: 1 })}>🙂</button>
+                  <button className="chip press" onClick={() => act({ action: "foodPref", foodId: f.id, value: 2 })}>😍</button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <AiEstimate />
+
+        {(s.favorites.length > 0 || s.yesterdayFoods.length > 0) && (
+          <Section title="Tek dokunuşla">
+            {s.yesterdayFoods.length > 0 && (
+              <button
+                className="btn btn-ghost w-full press mb-3"
+                onClick={() => act({ action: "addFoods", entries: s.yesterdayFoods.slice(0, 12), planned: false }, { toast: "Dünkü gibi eklendi", celebrate: true })}
+              >
+                🔁 Dün ne yediysem bugün de onu ({s.yesterdayFoods.length} kalem)
+              </button>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {s.favorites.map((f) => (
+                <button key={f.name + f.amount} className="chip press" onClick={() => act({ action: "addFoods", entries: [f], planned: false }, { toast: `${f.name} eklendi` })}>
+                  {f.name} <span className="label num">{f.kcal}</span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section title="Bugün yediklerin" aside={<span className="label num">{fmt(s.totals.kcal)} / {fmt(t.kcal)} kcal</span>}>
+          <Bar value={s.totals.kcal} max={t.kcal} height={10} label="Kalori" />
+          {s.foods.length === 0 ? (
+            <p className="mt-3" style={{ color: "var(--ink-2)" }}>{gain ? "Henüz bir şey yok. Kahvaltıyla başlayalım!" : "Henüz bir şey yok."}</p>
+          ) : (
+            <ul className="divide-y mt-2" style={{ borderColor: "var(--line)" }}>
+              {s.foods.map((f) => (
+                <li key={f.id} className="py-2 flex items-center gap-3">
+                  <span className="flex-1 min-w-0">
+                    <span className="font-semibold">{f.name}</span>
+                    <span className="label block">{[f.time, f.amount].filter(Boolean).join(", ")}</span>
+                  </span>
+                  <span className="num text-sm">{f.kcal} kcal</span>
                   <button className="label underline" onClick={() => act({ action: "delete", id: f.id })} aria-label={`${f.name} sil`}>
                     Sil
                   </button>
@@ -69,73 +151,31 @@ export default function Food() {
             </ul>
           )}
         </Section>
-      </div>
 
-      <div className="space-y-4">
-        <div className="flex gap-2 scroll-x" role="tablist">
-          {(
-            [
-              ["plan", "Günün planı"],
-              ["ai", "Plansız yedim"],
-              ["list", "Listeden seç"],
-              ["quick", "Hızlı tahmin"],
-              ["manual", "Elle gir"],
-            ] as [Mode, string][]
-          ).map(([m, l]) => (
-            <button key={m} className="chip whitespace-nowrap" aria-pressed={mode === m} onClick={() => setMode(m)}>
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {mode === "plan" && (
-          <Section title="Günün planı" aside={<span className="label">{gain ? "Kilo alma menüsü" : "Hafif ve doyurucu menü"}</span>}>
-            <p className="text-sm mb-3" style={{ color: "var(--ink-2)" }}>
-              {gain
-                ? "Saat tutmak zorunda değilsin. En az 3 ana öğün ve 1 shake, düzensiz bir günde bile seni hedefe yaklaştırır."
-                : "Her öğünde önce proteini ye. Saatler esnek, sadece kahvaltı ve akşam yemeği sabit çapan olsun."}
-            </p>
-            <ul className="space-y-2">
-              {plan.map((m, i) => {
-                const tot = mealTotals(m);
-                const logged = s.foods.some((f) => f.planned && f.meal === m.meal && m.items.some((it) => FOODS.find((x) => x.id === it.id)?.name === f.name));
-                return (
-                  <li key={i} className="rounded-xl border-[1.5px] p-3 flex items-center gap-3" style={{ borderColor: logged ? "var(--me)" : "var(--line)" }}>
-                    <div className="flex-1 min-w-0">
-                      <p className="label capitalize">{m.meal}</p>
-                      <p className="font-semibold">{m.title}</p>
-                      <p className="label">
-                        {m.items.map((it) => `${it.qty !== 1 ? it.qty + " × " : ""}${FOODS.find((f) => f.id === it.id)?.name}`).join(", ")}
-                      </p>
-                      <p className="num text-sm mt-1">{tot.kcal} kcal, {tot.protein} g protein</p>
-                    </div>
-                    <button
-                      className={`btn ${logged ? "btn-ghost" : "btn-me"} !px-4`}
-                      onClick={async () => {
-                        for (const it of m.items) await act({ action: "addFood", foodId: it.id, qty: it.qty, meal: m.meal, planned: true });
-                      }}
-                    >
-                      {logged ? "Tekrar ekle" : "Yedim"}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </Section>
-        )}
-
-        {mode === "ai" && <AiEstimate />}
-        {mode === "list" && <FoodList gain={gain} />}
-        {mode === "quick" && (
+        <section className="panel">
+          <p className="font-semibold">Başka yolla ekle</p>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {(
+              [
+                ["list", "📋 Listeden"],
+                ["quick", "⚡ Hızlı tahmin"],
+                ["manual", "✍️ Elle"],
+              ] as [Mode, string][]
+            ).map(([m, l]) => (
+              <button key={m} className="chip press" aria-pressed={more === m} onClick={() => setMore(more === m ? null : m)}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </section>
+        {more === "list" && <FoodList gain={gain} />}
+        {more === "quick" && (
           <Section title="Hızlı tahmin">
-            <p className="text-sm mb-3" style={{ color: "var(--ink-2)" }}>
-              Ne yediğini tam bilmiyorsan büyüklüğünü seç. Kesin olmasa da kaydetmek, hiç kaydetmemekten çok daha iyi; sistem zamanla bu hatayı dengeliyor.
-            </p>
             <div className="grid gap-2">
               {QUICK_SIZES.map((q) => (
                 <button
                   key={q.id}
-                  className="chip justify-between !rounded-xl !py-3"
+                  className="chip justify-between !rounded-xl !py-3 press"
                   onClick={() => act({ action: "addFood", entry: { name: q.label + " (tahmini)", amount: q.hint, kcal: q.kcal, protein: q.protein, carbs: q.carbs, fat: q.fat, source: "quick" }, planned: false }, { toast: "Kaydedildi" })}
                 >
                   <span className="text-left">
@@ -148,7 +188,7 @@ export default function Food() {
             </div>
           </Section>
         )}
-        {mode === "manual" && <Manual />}
+        {more === "manual" && <Manual />}
       </div>
     </div>
   );

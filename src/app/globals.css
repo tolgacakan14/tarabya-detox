@@ -3,46 +3,61 @@
 :root {
   --font-display: "Familjen Grotesk";
   --font-body: "Atkinson Hyperlegible";
-  --mist: #eef2f0;
-  --paper: #f8faf9;
-  --ink: #1c2b39;
-  --ink-2: #4f5f6c;
-  --ink-3: #8795a0;
-  --line: #d3ddd9;
-  --tolga: #d99a1e;
-  --tolga-soft: #f6e6c4;
-  --tolga-ink: #7a520a;
-  --eylul: #2e9c8a;
-  --eylul-soft: #cfeae4;
-  --eylul-ink: #13574c;
-  --warn: #b5562f;
-  --warn-soft: #f5dfd4;
-  --good: #3c7d4f;
+  --mist: #f4f1ff;
+  --paper: #ffffff;
+  --ink: #1f1b3a;
+  --ink-2: #5a5674;
+  --ink-3: #9a96b2;
+  --line: #e6e2f5;
+  --tolga: #ff8a00;
+  --tolga-2: #ff4d6d;
+  --tolga-soft: #fff0dc;
+  --tolga-ink: #a24a00;
+  --eylul: #10b5a3;
+  --eylul-2: #3a86ff;
+  --eylul-soft: #d9f6f1;
+  --eylul-ink: #0b6b60;
+  --sun: #ffd166;
+  --berry: #ff5d73;
+  --grape: #8b5cf6;
+  --sky: #4cc9f0;
+  --warn: #e0533a;
+  --warn-soft: #ffe6df;
+  --good: #22a06b;
   --me: var(--tolga);
+  --me-2: var(--tolga-2);
   --me-soft: var(--tolga-soft);
   --me-ink: var(--tolga-ink);
-  --radius-l: 22px;
-  --radius-s: 10px;
+  --radius-l: 26px;
+  --radius-s: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --mist: #13202b;
-    --paper: #1a2934;
-    --ink: #e8eeec;
-    --ink-2: #b2c0c8;
-    --ink-3: #7f909b;
-    --line: #2d3f4c;
-    --tolga-soft: #3d3016;
-    --tolga-ink: #f2c46a;
-    --eylul-soft: #173f39;
-    --eylul-ink: #7fd8c7;
-    --warn-soft: #45281c;
+    --mist: #15122b;
+    --paper: #221e3d;
+    --ink: #f2f0ff;
+    --ink-2: #c3bfdc;
+    --ink-3: #8f8aae;
+    --line: #37315a;
+    --tolga-soft: #3d2a14;
+    --tolga-ink: #ffc078;
+    --eylul-soft: #123d3a;
+    --eylul-ink: #7fe8d8;
+    --warn-soft: #45231c;
   }
+}
+
+[data-user="tolga"] {
+  --me: var(--tolga);
+  --me-2: var(--tolga-2);
+  --me-soft: var(--tolga-soft);
+  --me-ink: var(--tolga-ink);
 }
 
 [data-user="eylul"] {
   --me: var(--eylul);
+  --me-2: var(--eylul-2);
   --me-soft: var(--eylul-soft);
   --me-ink: var(--eylul-ink);
 }
@@ -51,6 +66,114 @@ html,
 body {
   background: var(--mist);
   color: var(--ink);
+}
+
+/* lively background: slow drifting colour blobs */
+.blobs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.blobs span {
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.45;
+  animation: drift 22s ease-in-out infinite alternate;
+}
+.blobs span:nth-child(1) {
+  background: var(--me);
+  top: -18vmax;
+  left: -12vmax;
+}
+.blobs span:nth-child(2) {
+  background: var(--grape);
+  top: 30vh;
+  right: -20vmax;
+  animation-duration: 28s;
+  opacity: 0.22;
+}
+.blobs span:nth-child(3) {
+  background: var(--sun);
+  bottom: -22vmax;
+  left: 10vw;
+  animation-duration: 25s;
+  opacity: 0.28;
+}
+@keyframes drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(6vmax, 4vmax) scale(1.12);
+  }
+}
+
+.grad-me {
+  background: linear-gradient(120deg, var(--me), var(--me-2));
+}
+.text-grad {
+  background: linear-gradient(120deg, var(--me), var(--me-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* progress bar with moving shine */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 45%, transparent 70%);
+  transform: translateX(-100%);
+  animation: shine 2.8s ease-in-out infinite;
+}
+@keyframes shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* confetti burst */
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+.confetti i {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  width: 9px;
+  height: 14px;
+  border-radius: 3px;
+  animation: burst 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes burst {
+  0% {
+    transform: translate(0, 0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--r));
+    opacity: 0;
+  }
+}
+
+.press {
+  transition: transform 0.12s ease;
+}
+.press:active {
+  transform: scale(0.95);
 }
 
 body {
@@ -100,8 +223,9 @@ body {
   opacity: 0.45;
 }
 .btn-me {
-  background: var(--me);
+  background: linear-gradient(120deg, var(--me), var(--me-2));
   color: #fff;
+  box-shadow: 0 6px 18px -8px var(--me-2);
 }
 .btn-ghost {
   background: transparent;
@@ -236,8 +360,14 @@ body {
   .rise,
   .avatar-bob,
   .avatar-blink,
-  .avatar-confetti {
+  .avatar-confetti,
+  .blobs span,
+  .shine::after,
+  .confetti i {
     animation: none;
+  }
+  .confetti {
+    display: none;
   }
 }
 

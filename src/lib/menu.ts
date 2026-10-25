@@ -234,8 +234,40 @@ export function buildMenu(opts: {
     meals.push({ slot, items: mi, kcal: mi.reduce((a, i) => a + i.kcal, 0), protein: mi.reduce((a, i) => a + i.protein, 0) });
   });
 
+  // protein top-up: add the best liked protein food to a snack slot if the day falls short
+  let proteinNow = meals.reduce((a, m) => a + m.protein, 0);
+  if (proteinNow < opts.protein * 0.9) {
+    const snackMeal = meals.find((m) => m.slot === "ara öğün") ?? meals[meals.length - 1];
+    const cands = pool
+      .filter((f) => f.tags.includes("protein") && !used.has(f.id) && META[f.id].slots.some((s) => s === "ara öğün" || s === snackMeal.slot))
+      .sort((a, b) => score(b) * (b.protein / b.kcal) - score(a) * (a.protein / a.kcal));
+    const f = cands[0];
+    if (!f) {
+      // no new protein food they eat: enlarge the most protein-dense item they already have
+      let best: { m: MenuMeal; i: MenuItem } | null = null;
+      for (const m of meals)
+        for (const i of m.items)
+          if (i.kcal > 0 && (!best || i.protein / i.kcal > best.i.protein / best.i.kcal)) best = { m, i };
+      if (best && best.i.qty < 3) {
+        const food = FOODS.find((x) => x.id === best!.i.foodId)!;
+        best.i.qty += 0.5;
+        best.i.kcal = Math.round(food.kcal * best.i.qty);
+        best.i.protein = Math.round(food.protein * best.i.qty);
+        best.m.kcal = best.m.items.reduce((a, x) => a + x.kcal, 0);
+        best.m.protein = best.m.items.reduce((a, x) => a + x.protein, 0);
+        proteinNow = meals.reduce((a, m) => a + m.protein, 0);
+      }
+    } else {
+      const qty = goal === "lose" ? 1 : 1.5;
+      snackMeal.items.push({ foodId: f.id, qty, name: f.name, portion: f.portion, kcal: Math.round(f.kcal * qty), protein: Math.round(f.protein * qty), isNew: (prefs[f.id] ?? 0) === 0 });
+      snackMeal.kcal += Math.round(f.kcal * qty);
+      snackMeal.protein += Math.round(f.protein * qty);
+      proteinNow = meals.reduce((a, m) => a + m.protein, 0);
+    }
+  }
+
   const kcal = meals.reduce((a, m) => a + m.kcal, 0);
-  const protein = meals.reduce((a, m) => a + m.protein, 0);
+  const protein = proteinNow;
   let note: string | undefined;
   if (known < 12) note = "Henüz neleri sevdiğini tam bilmiyorum. Menüdeki yeni yiyecekleri işaretledikçe sadece sevdiklerinden menü kuracağım.";
   else if (protein < opts.protein * 0.8) note = "Sevdiğin yiyeceklerle protein hedefi zor tutuyor. Yumurta, yoğurt, tavuk ya da ton balığından birini sevdiklerine eklersen menü çok daha iyi olur.";

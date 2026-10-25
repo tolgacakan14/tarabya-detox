@@ -4,9 +4,10 @@ import type { AppState } from "@/lib/state";
 
 export interface Ctx {
   s: AppState;
-  act: (body: Record<string, unknown>, opts?: { toast?: string; points?: number }) => Promise<boolean>;
+  act: (body: Record<string, unknown>, opts?: { toast?: string; points?: number; celebrate?: boolean }) => Promise<boolean>;
   reload: () => Promise<void>;
   toast: (t: string) => void;
+  celebrate: () => void;
   go: (tab: TabId) => void;
 }
 export type TabId = "bugun" | "yemek" | "antrenman" | "koc" | "yaris" | "ilerleme";
@@ -18,7 +19,7 @@ export const useApp = () => {
   return c;
 };
 
-export function Bar({ value, max, color = "var(--me)", height = 10, label }: { value: number; max: number; color?: string; height?: number; label?: string }) {
+export function Bar({ value, max, color = "linear-gradient(90deg, var(--me), var(--me-2))", height = 10, label }: { value: number; max: number; color?: string; height?: number; label?: string }) {
   const pct = Math.max(0, Math.min(1, max ? value / max : 0));
   return (
     <div
@@ -30,7 +31,7 @@ export function Bar({ value, max, color = "var(--me)", height = 10, label }: { v
       className="w-full rounded-full overflow-hidden"
       style={{ background: "var(--line)", height }}
     >
-      <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct * 100}%`, background: color }} />
+      <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct * 100}%`, background: color }} />
     </div>
   );
 }
@@ -62,6 +63,7 @@ export function Stat({ value, unit, label }: { value: React.ReactNode; unit?: st
 }
 
 export const fmt = (n: number) => Math.round(n).toLocaleString("tr-TR");
+export const kg = (n: number) => (Math.round(n * 10) / 10).toLocaleString("tr-TR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export function Check() {
   return (
