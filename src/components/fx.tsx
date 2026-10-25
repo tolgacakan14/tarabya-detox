@@ -54,7 +54,12 @@ export function Ring({
 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, max ? value / max : 0));
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShown(true), 60); // draw in on mount
+    return () => clearTimeout(t);
+  }, []);
+  const pct = shown ? Math.max(0, Math.min(1, max ? value / max : 0)) : 0;
   const id = label.replace(/\W/g, "");
   return (
     <div className="relative inline-grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={`${label}: ${Math.round(pct * 100)}%`}>
@@ -76,7 +81,7 @@ export function Ring({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pct)}
-          style={{ transition: "stroke-dashoffset 0.9s cubic-bezier(.2,.8,.2,1)" }}
+          style={{ transition: "stroke-dashoffset 0.9s cubic-bezier(.16,1,.3,1)" }}
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">{children}</div>

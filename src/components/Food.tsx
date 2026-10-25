@@ -17,6 +17,7 @@ export default function Food() {
   const t = s.engine.targets;
   const gain = s.profile.goal === "gain";
   const { menu, prefs, reroll, eaten } = useMenu(s);
+  const [openMeal, setOpenMeal] = useState<number | null>(null);
   const [more, setMore] = useState<Mode | null>(null);
   const asks = nextQuestions(prefs, 3);
 
@@ -41,12 +42,22 @@ export default function Food() {
               const done = eaten(idx);
               return (
                 <li key={idx} className="rounded-2xl p-3 border-2 transition-colors" style={{ borderColor: done ? "var(--me)" : "var(--line)", background: done ? "var(--me-soft)" : "transparent" }}>
-                  <div className="flex items-center justify-between gap-2">
+                  <button className="w-full flex items-center justify-between gap-2 text-left" onClick={() => setOpenMeal(openMeal === idx ? null : idx)} aria-expanded={openMeal === idx}>
                     <p className="font-bold capitalize">
                       <span aria-hidden>{SLOT_ICON[m.slot]}</span> {m.slot}
+                      {done && <span className="label normal-case"> · yendi ✓</span>}
                     </p>
-                    <span className="label num">{m.kcal} kcal</span>
-                  </div>
+                    <span className="label num">
+                      {m.kcal} kcal {openMeal === idx ? "▲" : "▼"}
+                    </span>
+                  </button>
+                  {openMeal !== idx && (
+                    <p className="text-sm mt-1 truncate" style={{ color: "var(--ink-2)" }}>
+                      {m.items.map((it) => (it.qty !== 1 ? `${String(it.qty).replace(".", ",")}× ` : "") + it.name).join(" · ")}
+                      {m.items.some((it) => it.isNew) && !done ? " · 🆕" : ""}
+                    </p>
+                  )}
+                  {openMeal === idx && (
                   <ul className="mt-1.5 space-y-1">
                     {m.items.map((it) => (
                       <li key={it.foodId} className="flex items-center gap-2">
@@ -57,10 +68,10 @@ export default function Food() {
                         </span>
                         {it.isNew && !done && (
                           <span className="flex gap-1">
-                            <button className="chip !px-2 !py-0.5 press" aria-label={`${it.name} yerim`} onClick={() => act({ action: "foodPref", foodId: it.foodId, value: 1 })}>
+                            <button className="chip !px-2.5 press" aria-label={`${it.name} yerim`} onClick={() => act({ action: "foodPref", foodId: it.foodId, value: 1 })}>
                               👍
                             </button>
-                            <button className="chip !px-2 !py-0.5 press" aria-label={`${it.name} yemem`} onClick={() => act({ action: "foodPref", foodId: it.foodId, value: -1 })}>
+                            <button className="chip !px-2.5 press" aria-label={`${it.name} yemem`} onClick={() => act({ action: "foodPref", foodId: it.foodId, value: -1 })}>
                               👎
                             </button>
                           </span>
@@ -68,6 +79,7 @@ export default function Food() {
                       </li>
                     ))}
                   </ul>
+                  )}
                   <div className="flex gap-2 mt-2.5">
                     <button
                       className={`btn ${done ? "btn-ghost" : "btn-me"} flex-1 press !py-2`}

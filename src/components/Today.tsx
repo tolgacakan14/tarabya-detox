@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import QuickLog from "./QuickLog";
 import { DayBar } from "./DayEnd";
 import { TogetherStreak } from "./CoupleMeter";
@@ -119,40 +120,57 @@ function ProgressHero() {
 function RingsCard() {
   const { s, act } = useApp();
   const t = s.engine.targets;
+  const [drop, setDrop] = useState(0);
+  const left = t.kcal - s.totals.kcal;
+  const gain = s.profile.goal === "gain";
   return (
     <section className="panel">
-      <div className="grid grid-cols-3 gap-2 justify-items-center">
-        <div className="text-center">
-          <Ring value={s.totals.kcal} max={t.kcal} colors={["#ff8a00", "#ff4d6d"]} label="Kalori">
+      <div className="flex items-center gap-4">
+        <Ring value={s.totals.kcal} max={t.kcal} size={136} stroke={14} colors={["#ff8a00", "#ff4d6d"]} label="Kalori">
+          <div>
+            <p className="display font-bold text-3xl num leading-none">{fmt(s.totals.kcal)}</p>
+            <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {fmt(t.kcal)} kcal</p>
+          </div>
+        </Ring>
+        <div className="flex-1 min-w-0 space-y-3">
+          <p className="text-sm font-semibold leading-snug">
+            {left > 0 ? (gain ? `${fmt(left)} kcal daha ye` : `${fmt(left)} kcal hakkın var`) : gain ? "Hedef tamam 💪" : left < -t.kcal * 0.05 ? "Bugünlük yeter 🙂" : "Hedeftesin 👏"}
+          </p>
+          <div className="flex items-center gap-3">
+            <Ring value={s.totals.protein} max={t.protein} size={60} stroke={8} colors={["#8b5cf6", "#3a86ff"]} label="Protein">
+              <span className="text-[11px] font-bold num">{Math.round((s.totals.protein / Math.max(1, t.protein)) * 100)}%</span>
+            </Ring>
             <div>
-              <p className="display font-bold text-xl num leading-none">{fmt(s.totals.kcal)}</p>
-              <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {fmt(t.kcal)}</p>
+              <p className="font-bold num leading-tight">
+                {fmt(s.totals.protein)} <span className="label">/ {t.protein} g</span>
+              </p>
+              <p className="label">protein</p>
             </div>
-          </Ring>
-          <p className="text-sm font-semibold mt-1">Kalori</p>
+          </div>
+          <button
+            className="flex items-center gap-3 press text-left relative"
+            onClick={() => {
+              setDrop((d) => d + 1);
+              act({ action: "water", delta: 1 }, { toast: "💧 Bir bardak su", points: s.water < WATER_TARGET ? 5 : 0, celebrate: s.water + 1 === WATER_TARGET });
+            }}
+            aria-label="Bir bardak su ekle"
+          >
+            <span className="relative">
+              <Ring value={s.water} max={WATER_TARGET} size={60} stroke={8} colors={["#4cc9f0", "#10b5a3"]} label="Su">
+                <span className="text-lg" aria-hidden>
+                  💧
+                </span>
+              </Ring>
+              {drop > 0 && <span key={drop} className="water-ripple" aria-hidden />}
+            </span>
+            <span>
+              <span className="font-bold num leading-tight block">
+                {s.water} <span className="label">/ {WATER_TARGET} bardak</span>
+              </span>
+              <span className="label">dokun: +1</span>
+            </span>
+          </button>
         </div>
-        <div className="text-center">
-          <Ring value={s.totals.protein} max={t.protein} colors={["#8b5cf6", "#3a86ff"]} label="Protein">
-            <div>
-              <p className="display font-bold text-xl num leading-none">{fmt(s.totals.protein)}</p>
-              <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {t.protein} g</p>
-            </div>
-          </Ring>
-          <p className="text-sm font-semibold mt-1">Protein</p>
-        </div>
-        <button
-          className="text-center press"
-          onClick={() => act({ action: "water", delta: 1 }, { toast: "💧 Bir bardak su", points: s.water < WATER_TARGET ? 5 : 0, celebrate: s.water + 1 === WATER_TARGET })}
-          aria-label="Bir bardak su ekle"
-        >
-          <Ring value={s.water} max={WATER_TARGET} colors={["#4cc9f0", "#10b5a3"]} label="Su">
-            <div>
-              <p className="display font-bold text-xl num leading-none">{s.water}</p>
-              <p className="text-[11px]" style={{ color: "var(--ink-3)" }}>/ {WATER_TARGET} 💧</p>
-            </div>
-          </Ring>
-          <p className="text-sm font-semibold mt-1">Su +1</p>
-        </button>
       </div>
     </section>
   );
