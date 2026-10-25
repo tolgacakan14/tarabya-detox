@@ -50,7 +50,7 @@ export default function Coach() {
               <p className="mt-2 mx-auto max-w-md" style={{ color: "var(--ink-2)" }}>
                 Ne yediğini, nasıl hissettiğini, gününün nasıl geçtiğini yaz. Yediklerini kaydeder, planını günceller, görev ekler.
               </p>
-              {!ai && <p className="mt-3 text-sm" style={{ color: "var(--warn)" }}>Koç henüz bağlı değil: Vercel'e ANTHROPIC_API_KEY eklenince çalışacak.</p>}
+              {!ai && <p className="mt-3 text-sm" style={{ color: "var(--warn)" }}>Koç henüz bağlı değil: Vercel'e ücretsiz GROQ_API_KEY eklenince çalışacak.</p>}
             </div>
           )}
           {msgs.map((m, i) => (

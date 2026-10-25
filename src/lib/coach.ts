@@ -1,20 +1,13 @@
 // AI diet & training coach. Talks in Turkish, motivational-interviewing style,
 // and updates the plan through tools. Every change passes engine guardrails.
-import Anthropic from "@anthropic-ai/sdk";
+import { runChat, extract, hasAI, type ToolDef } from "./llm";
 import { add, list, setDaily, type UserId } from "./store";
 import { buildState, getProfile, saveProfile, type WorkoutLog } from "./state";
 import { clampKcalAdjust, clampTargetWeight, type FoodEntry } from "./engine";
 import { addDays, nowTime, today as todayFn, trDay } from "./dates";
 import { PARTNER } from "./profiles";
 
-export const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
-export const hasAI = () => !!process.env.ANTHROPIC_API_KEY;
-
-let _client: Anthropic | null = null;
-function client() {
-  if (!_client) _client = new Anthropic();
-  return _client;
-}
+export { hasAI };
 
 const foodItemSchema = {
   type: "object" as const,
@@ -29,7 +22,7 @@ const foodItemSchema = {
   required: ["name", "amount", "kcal", "protein", "carbs", "fat"],
 };
 
-const TOOLS: Anthropic.Tool[] = [
+const TOOLS: ToolDef[] = [
   {
     name: "log_food",
     description:
@@ -308,43 +301,29 @@ export async function chat(user: UserId, message: string): Promise<{ reply: stri
   const date = todayFn();
   await add<ChatMsg>(user, "chat", date, { role: "user", content: message });
   if (!hasAI()) {
-    const reply = "Koçun henüz bağlı değil. Vercel'de ANTHROPIC_API_KEY ortam değişkeni eklenince seninle konuşmaya başlarım.";
+    const reply = "Koçun henüz bağlı değil. Vercel'de GROQ_API_KEY (ücretsiz) ortam değişkeni eklenince seninle konuşmaya başlarım.";
     await add<ChatMsg>(user, "chat", date, { role: "assistant", content: reply });
     return { reply, changed: false };
   }
   const state = await buildState(user);
-  const history = (await list<ChatMsg>(user, "chat", addDays(date, -7))).slice(-24);
-  const messages: Anthropic.MessageParam[] = history.map((h) => ({ role: h.data.role, content: h.data.content }));
-  // ensure first message is from user
+  const past = (await list<ChatMsg>(user, "chat", addDays(date, -7))).slice(-20);
+  const messages = past.map((h) => ({ role: h.data.role, content: h.data.content }));
   while (messages.length && messages[0].role !== "user") messages.shift();
 
-  let changed = false;
   let reply = "";
-  for (let i = 0; i < 5; i++) {
-    const res = await client().messages.create({
-      model: MODEL,
-      max_tokens: 1200,
+  let changed = false;
+  try {
+    const r = await runChat({
       system: systemPrompt(state),
+      history: messages,
       tools: TOOLS,
-      messages,
+      exec: (c) => runTool(user, c.name, c.input),
     });
-    const text = res.content.filter((c): c is Anthropic.TextBlock => c.type === "text").map((c) => c.text).join("\n").trim();
-    if (text) reply = text;
-    const uses = res.content.filter((c): c is Anthropic.ToolUseBlock => c.type === "tool_use");
-    if (res.stop_reason !== "tool_use" || !uses.length) break;
-    messages.push({ role: "assistant", content: res.content });
-    const results: Anthropic.ToolResultBlockParam[] = [];
-    for (const u of uses) {
-      changed = true;
-      let out: string;
-      try {
-        out = await runTool(user, u.name, u.input as Record<string, unknown>);
-      } catch (err) {
-        out = "Hata: " + (err as Error).message;
-      }
-      results.push({ type: "tool_result", tool_use_id: u.id, content: out });
-    }
-    messages.push({ role: "user", content: results });
+    reply = r.text;
+    changed = r.usedTools;
+  } catch (e) {
+    reply = (e as Error).message.startsWith("Ücretsiz kota") ? (e as Error).message : "Şu an cevap veremedim, birazdan tekrar dener misin?";
+    console.error("coach error", e);
   }
   if (!reply) reply = "Tamam, kaydettim.";
   await add<ChatMsg>(user, "chat", date, { role: "assistant", content: reply });
@@ -354,23 +333,16 @@ export async function chat(user: UserId, message: string): Promise<{ reply: stri
 /** Parses a free-text description of an unplanned meal into items with nutrition. */
 export async function estimateFood(text: string): Promise<FoodEntry[]> {
   if (!hasAI()) throw new Error("AI anahtarı tanımlı değil");
-  const res = await client().messages.create({
-    model: MODEL,
-    max_tokens: 800,
-    system:
-      "Sen bir Türk diyetisyenisin. Kullanıcının yazdığı yemekleri kalemlere ayır ve her biri için gerçekçi kalori ve makro tahmini yap. Türkiye'deki tipik restoran/ev porsiyonlarını kullan. Büyük porsiyonları küçük tahmin etme. Porsiyon belirtilmemişse orta porsiyon varsay.",
-    tools: [
-      {
-        name: "food_items",
-        description: "Tahmin edilen yemek kalemleri",
-        input_schema: { type: "object", properties: { items: { type: "array", items: foodItemSchema } }, required: ["items"] },
-      },
-    ],
-    tool_choice: { type: "tool", name: "food_items" },
-    messages: [{ role: "user", content: text }],
-  });
-  const use = res.content.find((c): c is Anthropic.ToolUseBlock => c.type === "tool_use");
-  const items = ((use?.input as { items?: FoodEntry[] })?.items ?? []).map((i) => ({
+  const out = await extract(
+    "Sen bir Türk diyetisyenisin. Kullanıcının yazdığı yemekleri kalemlere ayır ve her biri için gerçekçi kalori ve makro tahmini yap. Türkiye'deki tipik restoran/ev porsiyonlarını kullan. Büyük porsiyonları küçük tahmin etme. Porsiyon belirtilmemişse orta porsiyon varsay.",
+    text,
+    {
+      name: "food_items",
+      description: "Tahmin edilen yemek kalemleri",
+      input_schema: { type: "object", properties: { items: { type: "array", items: foodItemSchema } }, required: ["items"] },
+    }
+  );
+  const items = ((out as { items?: FoodEntry[] }).items ?? []).map((i) => ({
     name: String(i.name),
     amount: String(i.amount ?? ""),
     kcal: Math.round(Number(i.kcal) || 0),

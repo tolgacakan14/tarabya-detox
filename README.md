@@ -13,8 +13,8 @@ Tolga ve Eylül için kişiye özel beslenme, antrenman ve motivasyon uygulamas�
 | Anahtar | Açıklama |
 |---|---|
 | `DATABASE_URL` | Neon Postgres bağlantısı (Vercel Storage → Neon ile otomatik gelir) |
-| `ANTHROPIC_API_KEY` | Diyet koçu için |
+| `GROQ_API_KEY` | Diyet koçu için, ücretsiz (console.groq.com). Alternatif: `GEMINI_API_KEY` ya da `ANTHROPIC_API_KEY` |
 | `SESSION_SECRET` | Rastgele uzun bir metin, giriş çerezini imzalar |
-| `ANTHROPIC_MODEL` | İsteğe bağlı, varsayılan `claude-sonnet-5-5` |
+| `GROQ_MODEL` / `GEMINI_MODEL` | İsteğe bağlı, boşsa uygun model otomatik seçilir |
 
 `DATABASE_URL` yoksa uygulama geçici bellek kullanır; veriler kalıcı değildir.

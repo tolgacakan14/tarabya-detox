@@ -21,17 +21,10 @@ export async function POST(req: Request) {
   try {
     if (body.action === "login") {
       if (!isUser(body.user)) return NextResponse.json({ error: "Profil seç" }, { status: 400 });
-      const { profile } = await getProfile(body.user);
-      if (profile.pin && String(body.pin ?? "") !== profile.pin) {
-        return NextResponse.json({ error: "PIN yanlış", needPin: true }, { status: 401 });
-      }
+      // No PINs: the link is shared by just the two of us.
+      await getProfile(body.user);
       await setSession(body.user);
       return NextResponse.json({ ok: true });
-    }
-    if (body.action === "pinRequired") {
-      if (!isUser(body.user)) return NextResponse.json({ error: "Profil seç" }, { status: 400 });
-      const { profile } = await getProfile(body.user);
-      return NextResponse.json({ needPin: !!profile.pin });
     }
     if (body.action === "logout") {
       await clearSession();
@@ -166,11 +159,6 @@ async function act(user: UserId, d: string, b: Body) {
       if (Array.isArray(patch.ifThen)) next.ifThen = patch.ifThen.map(String).filter(Boolean).slice(0, 6);
       if (typeof patch.cycleTracking === "boolean") next.cycleTracking = patch.cycleTracking;
       if (typeof patch.onboarded === "boolean") next.onboarded = patch.onboarded;
-      if (patch.pin !== undefined) {
-        const pin = String(patch.pin);
-        if (pin && !/^\d{4}$/.test(pin)) throw new Error("PIN 4 haneli olmalı");
-        next.pin = pin || undefined;
-      }
       await saveProfile(user, next);
       if (patch.startWeight !== undefined && !(await list(user, "weight", d, d)).length) {
         await setDaily(user, "weight", d, { kg: next.startWeight });

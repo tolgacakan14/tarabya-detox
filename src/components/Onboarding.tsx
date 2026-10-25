@@ -17,7 +17,6 @@ export default function Onboarding() {
     why: "",
     if1: "",
     if2: "",
-    pin: "",
   });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
@@ -32,7 +31,6 @@ export default function Onboarding() {
       ifThen: [f.if1, f.if2].filter(Boolean),
       onboarded: true,
     };
-    if (f.pin) patch.pin = f.pin;
     await act({ action: "profile", patch }, { toast: "Planın hazır" });
   };
 
@@ -90,9 +88,6 @@ export default function Onboarding() {
 
         {step === 2 && (
           <div className="mt-4 space-y-3">
-            <L label="4 haneli PIN (isteğe bağlı, profiline başkası girmesin)">
-              <input className="field num" inputMode="numeric" maxLength={4} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, "") })} />
-            </L>
             <ul className="text-sm space-y-1.5" style={{ color: "var(--ink-2)" }}>
               <li>Her sabah tartıl, ekranda günlük değil trend kilo var.</li>
               <li>Plansız yediklerini de kaydet; kesin olmasa da olur, sistem öğreniyor.</li>

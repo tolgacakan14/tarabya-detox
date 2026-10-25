@@ -13,7 +13,6 @@ export default function Progress() {
     dislikes: s.profile.dislikes,
     why: s.profile.why,
     ifThen: s.profile.ifThen.join("\n"),
-    pin: "",
   });
 
   return (
@@ -134,7 +133,6 @@ export default function Progress() {
                 why: p.why,
                 ifThen: p.ifThen.split("\n").map((x) => x.trim()).filter(Boolean),
               };
-              if (p.pin) patch.pin = p.pin;
               await act({ action: "profile", patch }, { toast: "Kaydedildi" });
             }}
           >
@@ -157,10 +155,6 @@ export default function Progress() {
             <label className="block">
               <span className="label">Eğer-ise planların (her satıra bir tane)</span>
               <textarea className="field min-h-20" value={p.ifThen} onChange={(ev) => setP({ ...p, ifThen: ev.target.value })} />
-            </label>
-            <label className="block">
-              <span className="label">{!s.hasPin ?"4 haneli PIN (isteğe bağlı)" : "PIN'i değiştir"}</span>
-              <input className="field num" inputMode="numeric" maxLength={4} value={p.pin} onChange={(ev) => setP({ ...p, pin: ev.target.value.replace(/\D/g, "") })} />
             </label>
             <button className="btn btn-me w-full">Kaydet</button>
           </form>

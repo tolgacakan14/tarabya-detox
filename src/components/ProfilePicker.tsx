@@ -12,26 +12,20 @@ const PEOPLE: { id: Who; name: string; line: string }[] = [
 
 export default function ProfilePicker() {
   const router = useRouter();
-  const [who, setWho] = useState<Who | null>(null);
-  const [pin, setPin] = useState("");
-  const [needPin, setNeedPin] = useState(false);
   const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Who | null>(null);
 
-  async function login(id: Who, p?: string) {
-    setBusy(true);
+  async function login(id: Who) {
+    setBusy(id);
     setErr("");
-    const r = await fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "login", user: id, pin: p }) });
-    const j = await r.json();
-    setBusy(false);
+    const r = await fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "login", user: id }) });
     if (r.ok) {
       router.push("/app");
       router.refresh();
-    } else if (j.needPin) {
-      setWho(id);
-      setNeedPin(true);
-      if (p) setErr("PIN yanlış, tekrar dene.");
-    } else setErr(j.error ?? "Giriş yapılamadı");
+    } else {
+      setBusy(null);
+      setErr("Giriş yapılamadı, tekrar dene.");
+    }
   }
 
   return (
@@ -45,56 +39,23 @@ export default function ProfilePicker() {
         {PEOPLE.map((p) => (
           <button
             key={p.id}
-            disabled={busy}
+            disabled={!!busy}
             onClick={() => login(p.id)}
             className="relative overflow-hidden text-left rounded-[28px] p-6 sm:p-8 min-h-[38dvh] sm:min-h-[60dvh] flex flex-col justify-end group"
             style={{ background: `var(--${p.id}-soft)`, color: `var(--${p.id}-ink)` }}
           >
             <Tide who={p.id} />
             <div className="relative flex-1 flex items-center justify-center pb-2">
-              <Avatar who={p.id} mood="happy" size={160} className="sm:w-[240px] sm:h-[240px]" />
+              <Avatar who={p.id} mood={busy === p.id ? "party" : "happy"} size={160} className="sm:w-[240px] sm:h-[240px]" />
             </div>
             <span className="relative display font-bold leading-[0.85] text-[18vw] sm:text-[8rem] transition-transform group-hover:-translate-y-1">
               {p.name}
             </span>
-            <span className="relative mt-7 text-lg">{p.line}</span>
+            <span className="relative mt-7 text-lg">{busy === p.id ? "Plan açılıyor…" : p.line}</span>
           </button>
         ))}
       </div>
-
-      {needPin && who && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="PIN gir">
-          <form
-            className="panel w-full max-w-sm"
-            data-user={who}
-            onSubmit={(e) => {
-              e.preventDefault();
-              login(who, pin);
-            }}
-          >
-            <p className="display text-2xl font-bold">{who === "tolga" ? "Tolga" : "Eylül"}, PIN'in?</p>
-            <input
-              autoFocus
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              className="field mt-4 text-center text-3xl tracking-[0.5em] num"
-              aria-label="4 haneli PIN"
-            />
-            {err && <p className="mt-2 text-sm" style={{ color: "var(--warn)" }}>{err}</p>}
-            <div className="flex gap-2 mt-4">
-              <button type="button" className="btn btn-ghost flex-1" onClick={() => { setNeedPin(false); setPin(""); setErr(""); }}>
-                Vazgeç
-              </button>
-              <button className="btn btn-me flex-1" disabled={pin.length !== 4 || busy}>
-                Gir
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-      {err && !needPin && <p className="text-center pb-6" style={{ color: "var(--warn)" }}>{err}</p>}
+      {err && <p className="text-center pb-6" style={{ color: "var(--warn)" }}>{err}</p>}
     </main>
   );
 }
