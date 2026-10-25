@@ -51,10 +51,10 @@ export default function ProfilePicker() {
             style={{ background: `var(--${p.id}-soft)`, color: `var(--${p.id}-ink)` }}
           >
             <Tide who={p.id} />
-            <div className="absolute inset-x-0 top-4 sm:top-10 flex justify-center">
-              <Avatar who={p.id} mood="happy" size={170} className="sm:w-[260px] sm:h-[312px]" />
+            <div className="relative flex-1 flex items-center justify-center pb-2">
+              <Avatar who={p.id} mood="happy" size={150} className="sm:w-[240px] sm:h-[288px]" />
             </div>
-            <span className="relative display font-bold leading-[0.85] text-[22vw] sm:text-[9rem] transition-transform group-hover:-translate-y-1">
+            <span className="relative display font-bold leading-[0.85] text-[18vw] sm:text-[8rem] transition-transform group-hover:-translate-y-1">
               {p.name}
             </span>
             <span className="relative mt-7 text-lg">{p.line}</span>
