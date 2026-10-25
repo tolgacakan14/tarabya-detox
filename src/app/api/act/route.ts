@@ -8,19 +8,17 @@ import { SYMPTOMS } from "@/lib/cycle";
 import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
+import { boundedNumber, validDate, validFood } from "@/lib/validate";
 
 
 type Body = Record<string, unknown> & { action: string };
 
-const num = (v: unknown, min: number, max: number) => {
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < min || n > max) throw new Error("Geçersiz değer");
-  return n;
-};
+const num = boundedNumber;
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as Body;
   try {
+    const body = (await req.json().catch(() => null)) as Body | null;
+    if (!body || typeof body !== "object" || typeof body.action !== "string") throw new Error("Geçersiz istek");
     if (body.action === "login") {
       if (!isUser(body.user)) return NextResponse.json({ error: "Profil seç" }, { status: 400 });
       // No PINs: the link is shared by just the two of us.
@@ -62,15 +60,8 @@ async function act(user: UserId, d: string, b: Body) {
           source: "list",
         };
       } else {
-        entry = {
-          name: String(e.name).slice(0, 80),
-          amount: e.amount ? String(e.amount).slice(0, 60) : undefined,
-          kcal: num(e.kcal, 0, 5000),
-          protein: num(e.protein ?? 0, 0, 400),
-          carbs: num(e.carbs ?? 0, 0, 800),
-          fat: num(e.fat ?? 0, 0, 400),
-          source: e.source ?? "quick",
-        };
+        const v = validFood(e);
+        entry = { name: v.name, amount: v.amount, kcal: Math.round(v.kcal), protein: v.protein, carbs: v.carbs, fat: v.fat, source: (v.source as FoodEntry["source"]) ?? "quick" };
       }
       entry.meal = b.meal ? String(b.meal) : undefined;
       entry.planned = b.planned === true;
@@ -154,15 +145,16 @@ async function act(user: UserId, d: string, b: Body) {
     case "addFoods": {
       // one-tap relog of several entries (favourites / yesterday's meal)
       const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 12) as FoodEntry[];
-      for (const e of entries) {
+      const valid = entries.map(validFood); // validate all before writing any
+      for (const v of valid) {
         await add<FoodEntry>(user, "food", d, {
-          name: String(e.name).slice(0, 80),
-          amount: e.amount ? String(e.amount).slice(0, 60) : undefined,
-          kcal: num(e.kcal, 0, 5000),
-          protein: num(e.protein ?? 0, 0, 400),
-          carbs: num(e.carbs ?? 0, 0, 800),
-          fat: num(e.fat ?? 0, 0, 400),
-          meal: e.meal ? String(e.meal) : undefined,
+          name: v.name,
+          amount: v.amount,
+          kcal: Math.round(v.kcal),
+          protein: v.protein,
+          carbs: v.carbs,
+          fat: v.fat,
+          meal: v.meal,
           planned: b.planned === true,
           time: nowTime(),
           source: "quick",
@@ -176,8 +168,7 @@ async function act(user: UserId, d: string, b: Body) {
     case "cycle": {
       const { profile } = await getProfile(user);
       if (profile.sex !== "f") throw new Error("Döngü takibi bu profilde yok");
-      const date = b.date ? String(b.date) : d;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > d || date < addDays(d, -200)) throw new Error("Geçersiz tarih");
+      const date = b.date === undefined ? d : validDate(b.date, addDays(d, -200), d);
       const prev = (await list<Record<string, unknown>>(user, "cycle", date, date))[0]?.data ?? {};
       const next: Record<string, unknown> = { ...prev };
       if (b.start !== undefined) next.start = !!b.start;
