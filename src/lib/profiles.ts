@@ -56,6 +56,8 @@ export interface Profile {
   // personal correction for AI plate estimates (O'Hara 2025: big plates are underestimated): EMA of saved ÷ suggested kcal
   // one-tap saved meals ("Klasik kahvaltım")
   presets?: Preset[];
+  // push reminders (null = off). Times are Istanbul "HH:MM".
+  reminders?: { weigh?: string | null; meal?: boolean; dayEnd?: string | null; partner?: boolean };
   aiFactor?: number;
   aiFactorN?: number; // undefined = intense (we both asked for the faster plan)
   kcalAdjust: number; // manual adjustment from coach, bounded by guardrails

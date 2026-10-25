@@ -3,6 +3,7 @@ import CycleCard from "./Cycle";
 import { WeightCharts, WeightHistory } from "./Weight";
 import { usePhotoPicker } from "./PhotoAvatar";
 import Avatar from "./Avatar";
+import { NotifySettings } from "./Notify";
 
 function DayModeCard() {
   const { s, act } = useApp();
@@ -118,6 +119,7 @@ export default function Progress() {
 
         <PhotoCard />
         <DayModeCard />
+        <NotifySettings />
         <details className="panel"><summary className="display text-xl font-semibold cursor-pointer">⚙️ Bilgilerimi düzenle</summary><div className="mt-3">
           <form
             className="space-y-2"

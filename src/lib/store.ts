@@ -18,7 +18,9 @@ export type Kind =
   | "cycle"
   | "flag"
   | "avatar"
-  | "bench";
+  | "bench"
+  | "push"
+  | "notif";
 
 export interface Rec<T = Record<string, unknown>> {
   id: string;

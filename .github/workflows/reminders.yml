@@ -1,0 +1,13 @@
+name: Hatırlatıcılar
+# Every 15 minutes, ask the app whether a push reminder is due. The endpoint is safe to call any time:
+# it only sends what is due, once per type per day, max 2 a day, never at night.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: curl -fsS --max-time 60 https://ikimiz-app.vercel.app/api/push/tick

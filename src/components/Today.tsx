@@ -2,6 +2,7 @@
 import { useState } from "react";
 import QuickLog from "./QuickLog";
 import { DayBar } from "./DayEnd";
+import { NotifyCard } from "./Notify";
 import { TogetherStreak } from "./CoupleMeter";
 import { usePhotoPicker } from "./PhotoAvatar";
 import { WeighIn } from "./Weight";
@@ -45,6 +46,7 @@ export default function Today() {
         <NextUp />
         <CycleMini />
         <PartnerStrip />
+        <NotifyCard />
         {s.engine.insights.filter((i) => i.tone === "warn").map((i, k) => (
           <p key={k} className="panel !py-3 text-sm" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
             {i.text}

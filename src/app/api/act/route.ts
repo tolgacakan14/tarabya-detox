@@ -8,6 +8,7 @@ import { QUEST_IDS, SYMPTOMS } from "@/lib/cycle";
 import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
+import { sendTo } from "@/lib/push";
 import { EXERCISES as OLD_EXERCISES } from "@/lib/programs";
 import { BENCHMARKS, LADDERS, PLANS, netKcal, type Effort } from "@/lib/training";
 import { boundedNumber, validDate, validFood } from "@/lib/validate";
@@ -186,6 +187,18 @@ async function act(user: UserId, d: string, b: Body) {
       await startNewDay(user);
       return;
     }
+    case "reminders": {
+      const { profile } = await getProfile(user);
+      const cur = profile.reminders ?? {};
+      const t = (v: unknown) => (v === null ? null : typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : undefined);
+      const next = { ...cur } as NonNullable<typeof profile.reminders>;
+      if (b.weigh !== undefined && t(b.weigh) !== undefined) next.weigh = t(b.weigh);
+      if (b.dayEnd !== undefined && t(b.dayEnd) !== undefined) next.dayEnd = t(b.dayEnd);
+      if (typeof b.meal === "boolean") next.meal = b.meal;
+      if (typeof b.partner === "boolean") next.partner = b.partner;
+      await saveProfile(user, { ...profile, reminders: next });
+      return;
+    }
     case "dayMode": {
       const { profile } = await getProfile(user);
       if (b.mode !== "manual" && b.mode !== "calendar") throw new Error("Geçersiz değer");
@@ -338,6 +351,18 @@ async function act(user: UserId, d: string, b: Body) {
       if (type === "walk" && sentToday.some((r) => (r.data as { type?: string }).type === "walk")) throw new Error("Yürüyüş davetini bugün zaten gönderdin");
       if (sentToday.length >= 10) throw new Error("Bugünlük yeter, yarın yine gönderebilirsin");
       await add(partner, "reaction", d, { from: user, type, text: b.text ? String(b.text).slice(0, 80) : undefined });
+      // tell the partner's phone (max 3 partner pushes a day)
+      try {
+        const { profile: pp } = await getProfile(partner);
+        const sentP = (await list<{ type: string }>(partner, "notif", today(), today())).filter((x) => x.data.type === "partner").length;
+        if (sentP < 3 && pp.reminders?.partner !== false) {
+          const from = user === "tolga" ? "Tolga" : "Eylül";
+          const body = { highfive: `${from} sana beşlik çaktı 🙌`, cheer: `${from} sana tezahürat yapıyor 📣`, proud: `${from} seninle gurur duyuyor 💛`, walk: `${from} seni sahile yürüyüşe çağırıyor 🌊` }[type] ?? `${from} bir şey gönderdi`;
+          await sendTo(partner, { title: "İkimiz", body, url: "/app", tag: "partner" }, "partner");
+        }
+      } catch {
+        /* push is best-effort */
+      }
       return;
     }
     case "profile": {
