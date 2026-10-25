@@ -4,6 +4,24 @@ import { WeightCharts, WeightHistory } from "./Weight";
 import { usePhotoPicker } from "./PhotoAvatar";
 import Avatar from "./Avatar";
 
+function DayModeCard() {
+  const { s, act } = useApp();
+  const manual = s.day.manual;
+  return (
+    <section className="panel">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-bold">🌙 Günümü ben bitireyim</p>
+        <button className="chip press" aria-pressed={manual} onClick={() => act({ action: "dayMode", mode: manual ? "calendar" : "manual" }, { toast: manual ? "Gün artık gece yarısı değişiyor" : "Günü sen bitireceksin" })}>
+          {manual ? "Açık" : "Kapalı"}
+        </button>
+      </div>
+      <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>
+        Geç yatıyorsan açık tut: gün gece yarısı değil, sen &quot;Günü bitir&quot; deyince ya da en geç ertesi gün 14:00&apos;te yenilenir. Gece yediklerin aynı güne yazılır.
+      </p>
+    </section>
+  );
+}
+
 function PhotoCard() {
   const { s } = useApp();
   const photo = usePhotoPicker();
@@ -99,6 +117,7 @@ export default function Progress() {
         </Section>
 
         <PhotoCard />
+        <DayModeCard />
         <details className="panel"><summary className="display text-xl font-semibold cursor-pointer">⚙️ Bilgilerimi düzenle</summary><div className="mt-3">
           <form
             className="space-y-2"

@@ -11,7 +11,8 @@ const MULTS = [0.75, 1, 1.25, 1.5];
 
 function slotNow(): string {
   const h = new Date().getHours();
-  return h < 11 ? "kahvaltı" : h < 15 ? "öğle" : h < 18 ? "ara öğün" : "akşam";
+  // after midnight still belongs to the evening (late sleepers)
+  return h < 5 ? "akşam" : h < 11 ? "kahvaltı" : h < 15 ? "öğle" : h < 18 ? "ara öğün" : "akşam";
 }
 
 async function downscale(file: File, max = 1024): Promise<string> {
@@ -34,7 +35,7 @@ async function downscale(file: File, max = 1024): Promise<string> {
   }
 }
 
-export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () => void; autoFocus?: boolean }) {
+export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne yedin? 😋" }: { onDone?: () => void; autoFocus?: boolean; date?: string; title?: string }) {
   const { act } = useApp();
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
   return (
     <section className="panel relative overflow-hidden">
       <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full grad-me opacity-15" aria-hidden />
-      <h2 className="display text-2xl font-bold relative">Ne yedin? 😋</h2>
+      <h2 className="display text-2xl font-bold relative">{title}</h2>
 
       {!items && (
         <>
@@ -215,7 +216,7 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
                 key={q.id}
                 className="chip press"
                 onClick={async () => {
-                  if (await act({ action: "addFood", entry: { name: q.label + " (tahmini)", amount: q.hint, kcal: q.kcal, protein: q.protein, carbs: q.carbs, fat: q.fat, source: "quick" }, meal: slotNow(), planned: false }, { toast: "Kaydedildi" })) {
+                  if (await act({ action: "addFood", entry: { name: q.label + " (tahmini)", amount: q.hint, kcal: q.kcal, protein: q.protein, carbs: q.carbs, fat: q.fat, source: "quick" }, meal: slotNow(), planned: false, date }, { toast: "Kaydedildi" })) {
                     reset();
                     onDone?.();
                   }
@@ -280,7 +281,7 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
               onClick={async () => {
                 const meal = slotNow();
                 const ok = await act(
-                  { action: "addFoods", entries: scaled.map(({ low: _low, ...x }) => ({ ...x, meal, source: photo ? "photo" : "ai" })), planned: false },
+                  { action: "addFoods", entries: scaled.map(({ low: _low, ...x }) => ({ ...x, meal, source: photo ? "photo" : "ai" })), planned: false, date },
                   { toast: `${fmt(total)} kcal kaydedildi 😋`, celebrate: true }
                 );
                 if (ok) {

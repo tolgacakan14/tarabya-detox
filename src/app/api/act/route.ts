@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { clearSession, getSession, isUser, setSession } from "@/lib/session";
 import { add, list, remove, setDaily, update, type UserId } from "@/lib/store";
-import { getProfile, saveProfile, type Todo, type WorkoutLog } from "@/lib/state";
+import { getProfile, saveProfile, startNewDay, userToday, type Todo, type WorkoutLog } from "@/lib/state";
 import { clampTargetWeight, type FoodEntry } from "@/lib/engine";
 import { addDays, nowTime, today } from "@/lib/dates";
 import { QUEST_IDS, SYMPTOMS } from "@/lib/cycle";
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
     const user = await getSession();
     if (!user) return NextResponse.json({ error: "Giriş yapılmadı" }, { status: 401 });
-    const d = today();
+    const d = await userToday(user);
     await act(user, d, body);
     return NextResponse.json({ ok: true });
   } catch (e) {
@@ -69,7 +69,8 @@ async function cleanV2(user: UserId, v: unknown, minutes?: number): Promise<Part
     return [{ ladder: ladder.id, step, sets, effort }];
   });
   if (!items.some((i) => i.sets.some((x) => x > 0))) throw new Error("En az bir set kaydet");
-  const weights = await list<{ kg: number }>(user, "weight", addDays(today(), -60), today());
+  const t = await userToday(user);
+  const weights = await list<{ kg: number }>(user, "weight", addDays(t, -60), t);
   const kg = weights[weights.length - 1]?.data.kg ?? (await getProfile(user)).profile.startWeight;
   const mins = minutes ? Math.min(180, Math.max(1, Number(minutes) || 30)) : 30;
   return {
@@ -78,6 +79,9 @@ async function cleanV2(user: UserId, v: unknown, minutes?: number): Promise<Part
     kcal: netKcal(tpl.met, kg, mins),
   };
 }
+
+/** Foods can be added to the last 7 days ("dün gece yediğimi unuttum"). */
+const pastDay = (v: unknown, d: string) => (v === undefined || v === null || v === "" ? d : validDate(v, addDays(d, -7), d));
 
 async function act(user: UserId, d: string, b: Body) {
   switch (b.action) {
@@ -104,7 +108,7 @@ async function act(user: UserId, d: string, b: Body) {
       entry.meal = b.meal ? String(b.meal).slice(0, 40) : undefined;
       entry.planned = b.planned === true;
       entry.time = nowTime();
-      await add(user, "food", d, entry);
+      await add(user, "food", pastDay(b.date, d), entry);
       return;
     }
     case "delete": {
@@ -113,6 +117,16 @@ async function act(user: UserId, d: string, b: Body) {
       const own = await Promise.all((["food", "water", "workout", "todo", "weight"] as const).map((k) => list(user, k, addDays(d, -400), d)));
       if (!own.flat().some((r) => r.id === id)) throw new Error("Silinecek kayıt bulunamadı");
       await remove(user, id);
+      return;
+    }
+    case "newDay": {
+      await startNewDay(user);
+      return;
+    }
+    case "dayMode": {
+      const { profile } = await getProfile(user);
+      if (b.mode !== "manual" && b.mode !== "calendar") throw new Error("Geçersiz değer");
+      await saveProfile(user, { ...profile, dayMode: b.mode, activeDate: b.mode === "calendar" ? undefined : d });
       return;
     }
     case "avatar": {
@@ -213,8 +227,9 @@ async function act(user: UserId, d: string, b: Body) {
       // one-tap relog of several entries (favourites / yesterday's meal)
       const entries = (Array.isArray(b.entries) ? b.entries : []).slice(0, 12) as FoodEntry[];
       const valid = entries.map(validFood); // validate all before writing any
+      const fd = pastDay(b.date, d);
       for (const v of valid) {
-        await add<FoodEntry>(user, "food", d, {
+        await add<FoodEntry>(user, "food", fd, {
           name: v.name,
           amount: v.amount,
           kcal: Math.round(v.kcal),

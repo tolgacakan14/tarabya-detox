@@ -1,5 +1,6 @@
 "use client";
 import QuickLog from "./QuickLog";
+import { DayBar } from "./DayEnd";
 import { TogetherStreak } from "./CoupleMeter";
 import { usePhotoPicker } from "./PhotoAvatar";
 import { WeighIn, WeightCharts } from "./Weight";
@@ -33,6 +34,7 @@ export default function Today() {
   return (
     <div className="grid grid-cols-1 gap-4 items-start">
       <div className="space-y-4">
+        <DayBar />
         <ProgressHero />
         <WeighIn />
         <QuickLog />

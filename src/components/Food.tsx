@@ -1,5 +1,6 @@
 "use client";
 import QuickLog from "./QuickLog";
+import History from "./History";
 import { useMemo, useState } from "react";
 import { useApp, Bar, Section, fmt } from "./ui";
 import { FOODS, QUICK_SIZES, searchFoods } from "@/lib/foods";
@@ -124,6 +125,7 @@ export default function Food() {
       </div>
 
       <div className="space-y-4">
+        <History />
 
         {(s.favorites.length > 0 || s.yesterdayFoods.length > 0) && (
           <Section title="Tek dokunuşla">

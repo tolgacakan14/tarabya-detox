@@ -2,7 +2,7 @@
 // and updates the plan through tools. Every change passes engine guardrails.
 import { runChat, extract, extractVision, hasAI, type ToolDef } from "./llm";
 import { add, list, setDaily, type UserId } from "./store";
-import { buildState, getProfile, saveProfile, type WorkoutLog } from "./state";
+import { buildState, getProfile, saveProfile, userToday, type WorkoutLog } from "./state";
 import { clampKcalAdjust, clampTargetWeight, type FoodEntry } from "./engine";
 import { addDays, nowTime, today as todayFn, trDay } from "./dates";
 import { PARTNER } from "./profiles";
@@ -251,7 +251,7 @@ Rekabeti eğlenceli tut; geride olan tarafa nasıl yetişebileceğini somut gör
 }
 
 async function runTool(user: UserId, name: string, input: Record<string, unknown>): Promise<string> {
-  const date = todayFn();
+  const date = await userToday(user);
   const { profile } = await getProfile(user);
   switch (name) {
     case "log_food": {

@@ -1,6 +1,6 @@
 // Server-side helpers for self-planned workouts (used by the API and the coach).
 import { add, list, type UserId } from "./store";
-import { getProfile, type WorkoutLog } from "./state";
+import { getProfile, userToday, type WorkoutLog } from "./state";
 import { workoutImpact, quickParse, type Activity } from "./activity";
 import { addDays, today as todayFn } from "./dates";
 import { extract, hasAI } from "./llm";
@@ -37,7 +37,7 @@ export function sanitizeActivities(input: unknown): Activity[] {
 
 export async function logCustomWorkout(user: UserId, acts: Activity[], desc?: string, withPartner = false) {
   if (!acts.length) throw new Error("Aktivite bulunamadı");
-  const d = todayFn();
+  const d = await userToday(user);
   const weights = await list<{ kg: number }>(user, "weight", addDays(d, -30), d);
   const { profile } = await getProfile(user);
   const kg = weights.length ? weights[weights.length - 1].data.kg : profile.startWeight;

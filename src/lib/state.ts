@@ -2,7 +2,7 @@
 import { list, setDaily, type Rec, type UserId } from "./store";
 import { defaultProfile, PARTNER, type Profile } from "./profiles";
 import { runEngine, type EngineResult, type FoodEntry } from "./engine";
-import { addDays, daysBetween, today as todayFn, weekStart } from "./dates";
+import { addDays, daysBetween, hourNow, today as todayFn, weekStart } from "./dates";
 import { SESSIONS, phaseFor, cardioFor, MINI, EXERCISES } from "./programs";
 import { FOODS } from "./foods";
 import { analyzeBody, type Measure } from "./body";
@@ -48,6 +48,41 @@ export async function getProfile(user: UserId): Promise<{ profile: Profile; id?:
 
 export async function saveProfile(user: UserId, p: Profile) {
   await setDaily(user, "profile", PROFILE_DATE, p);
+}
+
+export const manualDay = (p: Profile) => (p.dayMode ?? (p.id === "tolga" ? "manual" : "calendar")) === "manual";
+
+/** The user's current day. In manual mode the day only changes when they start a new one;
+ * after 14:00 we move on by ourselves (nobody is still on "yesterday" by then). */
+export function dayInfo(p: Profile): { date: string; pending: boolean; calendar: string; move?: string } {
+  const cal = todayFn();
+  if (!manualDay(p)) return { date: cal, pending: false, calendar: cal };
+  // first time after midnight: you're most likely still on yesterday
+  let a = p.activeDate ?? (hourNow() < 5 ? addDays(cal, -1) : cal);
+  if (a > addDays(cal, 1)) a = cal;
+  if (a >= cal) return { date: a, pending: false, calendar: cal, move: a !== p.activeDate ? a : undefined };
+  if (hourNow() >= 14) return { date: cal, pending: false, calendar: cal, move: cal };
+  let d = a < addDays(cal, -1) ? addDays(cal, -1) : a; // at most one day behind
+  if (d < p.startDate) d = p.startDate; // never before the program started
+  return { date: d, pending: true, calendar: cal, move: d !== p.activeDate ? d : undefined };
+}
+
+/** Today for a user (server-side writes go to this date). Persists automatic moves. */
+export async function userToday(user: UserId): Promise<string> {
+  const { profile } = await getProfile(user);
+  const info = dayInfo(profile);
+  if (info.move) await saveProfile(user, { ...profile, activeDate: info.move });
+  return info.date;
+}
+
+/** "Günü bitir / yeni gün": start the next day now. */
+export async function startNewDay(user: UserId): Promise<string> {
+  const { profile } = await getProfile(user);
+  const cal = todayFn();
+  const cur = dayInfo(profile).date;
+  const next = cur < cal ? cal : addDays(cur, 1) > addDays(cal, 1) ? addDays(cal, 1) : addDays(cur, 1);
+  await saveProfile(user, { ...profile, activeDate: next, dayMode: profile.dayMode ?? (manualDay(profile) ? "manual" : "calendar") });
+  return next;
 }
 
 interface Raw {
@@ -129,6 +164,52 @@ function engineFor(raw: Raw, date: string) {
     exerciseKcal: raw.profile.goal === "lose" && raw.profile.intensity !== "standard" ? 0 : eatBack(raw.profile.goal, extra.kcal),
     exerciseBurn: extra.kcal,
   });
+}
+
+/** What each logged session burned (net kcal above rest), for the energy panel. */
+function sessionKcal(w: WorkoutLog, kg: number): number {
+  if (w.kcal) return w.kcal;
+  const h = (w.minutes ?? (w.type === "mini" ? 5 : 30)) / 60;
+  const met = w.type === "run" ? 9 : w.type === "walk" ? 4 : w.type === "mini" ? 5 : 5;
+  return Math.round((met - 1) * kg * h);
+}
+const SESSION_NAME: Record<string, string> = { strength: "Kuvvet antrenmanı", mini: "Mini antrenman", walk: "Yürüyüş", run: "Koşu / yürü-koş" };
+
+function activityDays(raw: Raw, today: string, days = 14) {
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = addDays(today, -i);
+    const kg = [...raw.weights].reverse().find((w) => w.date <= date)?.data.kg ?? raw.profile.startWeight;
+    const sessions = raw.workouts
+      .filter((w) => w.date === date)
+      .map((w) => ({
+        id: w.id,
+        kind: w.data.custom ? "custom" : w.data.type,
+        name: w.data.custom ? w.data.activities?.map((a) => a.name).join(" + ") || "Kendi antrenmanım" : w.data.v2 ? `Program ${w.data.v2.template.replace(/^[te]_/, "")} seansı` : SESSION_NAME[w.data.type],
+        minutes: w.data.minutes ?? (w.data.type === "mini" ? 5 : undefined),
+        kcal: sessionKcal(w.data, kg),
+        prs: w.data.v2?.prs ?? 0,
+        sets: w.data.v2 ? w.data.v2.items.reduce((a, it) => a + it.sets.filter((x) => x > 0).length, 0) : undefined,
+        together: !!w.data.withPartner,
+      }));
+    const steps = raw.steps.find((x) => x.date === date)?.data.steps ?? 0;
+    // walking cost ≈ 0.5 kcal per kg per km, ~1300 steps per km; only steps above a 3000 baseline count as extra
+    const stepKcal = Math.round((Math.max(0, steps - 3000) / 1300) * 0.5 * kg);
+    out.push({ date, sessions, exercise: sessions.reduce((a, x) => a + x.kcal, 0), steps, stepKcal, extra: extraBurn(raw, date).kcal });
+  }
+  return out;
+}
+
+/** Last 14 days of eating vs that day's target. */
+function eatingDays(raw: Raw, today: string, days = 14) {
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = addDays(today, -i);
+    const fs = raw.foods.filter((f) => f.date === date);
+    const target = date >= raw.profile.startDate ? engineFor(raw, date).targets.kcal : undefined;
+    out.push({ date, kcal: fs.reduce((a, f) => a + f.data.kcal, 0), protein: Math.round(fs.reduce((a, f) => a + (f.data.protein || 0), 0)), items: fs.length, target });
+  }
+  return out;
 }
 
 /** Energy burned on `date` by activity that the base TDEE doesn't already assume.
@@ -380,15 +461,16 @@ function coupleStreak(a: Raw, b: Raw, today: string) {
 }
 
 export async function buildState(user: UserId) {
-  const today = todayFn();
+  const today = await userToday(user);
   const partner = PARTNER[user];
   const [raw, praw] = await Promise.all([loadRaw(user), loadRaw(partner)]);
   const myWalks = partnerWalkDates(raw);
   const theirWalks = partnerWalkDates(praw);
   const me = summarize(raw, theirWalks, today);
-  const them = summarize(praw, myWalks, today);
+  const pToday = dayInfo(praw.profile).date; // the partner lives on their own day
+  const them = summarize(praw, myWalks, pToday);
   const eng = engineFor(raw, today);
-  const pEng = engineFor(praw, today);
+  const pEng = engineFor(praw, pToday);
   const todayScore = me.days[me.days.length - 1];
   const partnerToday = them.days[them.days.length - 1];
 
@@ -477,6 +559,7 @@ export async function buildState(user: UserId) {
     weighedToday: raw.weights.find((w) => w.date === today)?.data.kg,
     workoutsToday: raw.workouts.filter((w) => w.date === today).map((w) => ({ id: w.id, ...w.data })),
     program,
+    day: { ...dayInfo(raw.profile), manual: manualDay(raw.profile) },
     build: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
     plan: {
       training,
@@ -512,6 +595,8 @@ export async function buildState(user: UserId) {
       // both of us asked to see each other's curve; raw weights stay with the owner, the partner sees the smoothed trend
       trend: pEng.trend.map((t) => ({ date: t.date, trend: t.trend })),
     },
+    activity14: activityDays(raw, today),
+    eating14: eatingDays(raw, today),
     weightLog: raw.weights.slice(-60).map((w) => ({ id: w.id, date: w.date, kg: w.data.kg })),
     avatars: Object.fromEntries(
       await Promise.all(
