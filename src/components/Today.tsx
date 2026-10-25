@@ -85,9 +85,9 @@ function ProgressHero() {
           </span>
         </button>
         <div>
-          <p className="label">{gain ? "Aldığın kilo" : "Verdiğin kilo"}</p>
+          <p className="label">{change === 0 ? "Değişim" : good ? (gain ? "Aldığın kilo" : "Verdiğin kilo") : "Şimdilik ters yönde"}</p>
           <p className={`display font-bold leading-none num text-6xl ${good ? "text-grad" : ""}`}>
-            {sign}
+            {good && change !== 0 ? (gain ? "+" : "") : sign}
             {kg(Math.abs(change))}
             <span className="text-2xl font-semibold ml-1" style={{ color: "var(--ink-2)" }}>kg</span>
           </p>
@@ -178,6 +178,7 @@ function RingsCard() {
 
 function NextUp() {
   const { s, act, go } = useApp();
+  const [busyMeal, setBusyMeal] = useState(false);
   const { menu, prefs, eaten } = useMenu(s);
   const hour = new Date().getHours();
   const asks = nextQuestions(prefs, 1);
@@ -202,12 +203,11 @@ function NextUp() {
           <div className="flex gap-2 mt-3">
             <button
               className="btn btn-me flex-1 press"
+              disabled={busyMeal}
               onClick={async () => {
-                for (let k = 0; k < next.m.items.length; k++) {
-                  const it = next.m.items[k];
-                  const last = k === next.m.items.length - 1;
-                  await act({ action: "addFood", foodId: it.foodId, qty: it.qty, meal: next.m.slot, planned: true }, last ? { toast: "Afiyet olsun 😋", celebrate: true } : undefined);
-                }
+                setBusyMeal(true);
+                await act({ action: "logPlanned", meal: next.m.slot, items: next.m.items.map((i) => ({ foodId: i.foodId, qty: i.qty })) }, { toast: "Afiyet olsun 😋", celebrate: true });
+                setBusyMeal(false);
               }}
             >
               Yedim ✓

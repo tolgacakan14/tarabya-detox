@@ -51,7 +51,9 @@ export function DayBar({ pill = false }: { pill?: boolean }) {
               ? kcal >= t.kcal * 0.95
                 ? "Hedefi tutturdun, kas için tam gereken buydu 💪"
                 : `Hedefe ${fmt(t.kcal - kcal)} kcal kaldı. Yatmadan bir shake ya da tahin-pekmezli ekmek bunu kapatır.`
-              : kcal <= t.kcal * 1.05
+              : kcal < Math.max(s.engine.floor, t.kcal * 0.85)
+                ? "Bugün az yedin. Yatmadan bir yoğurt ya da yumurta gibi proteinli bir şey ekle, çok düşük gün kası yer."
+                : kcal <= t.kcal * 1.05
                 ? "Planın içinde kaldın 👏"
                 : "Bugün biraz fazla oldu, sorun değil; yarın plana devam."}
           </p>
@@ -96,7 +98,7 @@ export function DayBar({ pill = false }: { pill?: boolean }) {
     return (
       <>
         {summary}
-        <button className="chip press !min-h-[40px] font-semibold" onClick={() => setSheet(true)} aria-label="Günü bitir, özete bak">
+        <button className="chip press !min-h-[40px] font-semibold whitespace-nowrap" onClick={() => setSheet(true)} aria-label="Günü bitir, özete bak">
           <Icon name="moon" size={16} /> Günü bitir
         </button>
       </>

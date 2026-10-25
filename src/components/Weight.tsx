@@ -63,6 +63,7 @@ function Ruler({ value, onChange, min, max, trend, yesterday }: { value: number;
         aria-valuenow={value}
         tabIndex={0}
         onKeyDown={(e) => {
+          if (e.key === "ArrowRight" || e.key === "ArrowLeft") e.preventDefault();
           if (e.key === "ArrowRight") onChange(Math.min(max, round1(value + 0.1)));
           if (e.key === "ArrowLeft") onChange(Math.max(min, round1(value - 0.1)));
         }}
@@ -156,8 +157,8 @@ export function WeighIn() {
   const value = Number.isFinite(parsed) ? parsed : w;
   const valid = Number.isFinite(parsed) && parsed >= 30 && parsed <= 200;
   const center = s.engine.trend.length ? s.engine.currentWeight : s.profile.startWeight;
-  const rMin = Math.max(30, Math.floor(center - 8)),
-    rMax = Math.min(200, Math.ceil(center + 8));
+  const rMin = Math.max(30, Math.floor(Math.min(center, value) - 8)),
+    rMax = Math.min(200, Math.ceil(Math.max(center, value) + 8));
   const pick = (d: string) => {
     setDate(d);
     setTyped(null);

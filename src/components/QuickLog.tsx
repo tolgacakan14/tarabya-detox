@@ -341,7 +341,7 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
                 if (ok) {
                   // teach the estimator how big your plates really are
                   const raw = (items ?? []).reduce((x, i) => x + i.kcal, 0);
-                  if (raw > 0) fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "aiFeedback", ratio: (total / raw) * factor }) }).catch(() => {});
+                  if (raw > 0 && photo) fetch("/api/act", { method: "POST", body: JSON.stringify({ action: "aiFeedback", ratio: (total / raw) * factor }) }).catch(() => {});
                   reset();
                   onDone?.();
                 }

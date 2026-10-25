@@ -284,7 +284,7 @@ function scoreDay(raw: Raw, eng: EngineResult, date: string, partnerWalks: Set<s
   const steps = dailyVal(raw.steps, (d) => d.steps, date) ?? 0;
   const water = sumBy(raw.water, (d) => d.glasses, date);
   const sleep = dailyVal(raw.sleep, (d) => d.hours, date);
-  const weighed = raw.weights.some((w) => w.date === date);
+  const weighed = raw.weights.some((w) => w.date === date && !(w.data as { late?: boolean }).late);
   const wos = raw.workouts.filter((w) => w.date === date);
   const strength = wos.some((w) => w.data.type === "strength");
   const mini = wos.some((w) => w.data.type === "mini");
@@ -428,7 +428,7 @@ function exerciseMemory(raw: Raw) {
   for (const w of raw.workouts) {
     if (w.data.type !== "strength") continue;
     for (const e of w.data.exercises ?? []) {
-      const def = EXERCISES[e.id];
+      const def = Object.hasOwn(EXERCISES, e.id) ? EXERCISES[e.id] : undefined;
       if (!def) continue;
       const done = e.sets.filter((s) => s > 0);
       const levelUp = done.length > 0 && done.every((s) => s >= def.repMax);
@@ -534,7 +534,7 @@ export async function buildState(user: UserId) {
   const weekMuscles: Partial<Record<Muscle, number>> = {};
   for (const w of raw.workouts.filter((x) => x.date >= ws)) {
     for (const e of w.data.exercises ?? []) {
-      const def = EXERCISES[e.id];
+      const def = Object.hasOwn(EXERCISES, e.id) ? EXERCISES[e.id] : undefined;
       if (!def) continue;
       const done = e.sets.filter((x) => x > 0).length;
       musclesFromLabel(def.muscle).forEach((m, i) => (weekMuscles[m] = (weekMuscles[m] ?? 0) + (i === 0 ? done : done * 0.5)));

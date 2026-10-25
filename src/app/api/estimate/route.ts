@@ -20,7 +20,8 @@ export async function POST(req: Request) {
     // learned personal correction, only after 10 corrections so one odd meal doesn't skew it
     const { profile } = await getProfile(user);
     const f = profile.aiFactor ?? 1;
-    const applied = (profile.aiFactorN ?? 0) >= 10 && Math.abs(f - 1) >= 0.05 ? f : 1;
+    // only photo portions are corrected; when you type "200 g tavuk" you said how much
+    const applied = image && (profile.aiFactorN ?? 0) >= 10 && Math.abs(f - 1) >= 0.05 ? f : 1;
     if (applied !== 1)
       items = items.map((i) => ({ ...i, kcal: Math.round(i.kcal * f), protein: Math.round(i.protein * f * 10) / 10, carbs: Math.round(i.carbs * f * 10) / 10, fat: Math.round(i.fat * f * 10) / 10 }));
     if (!items.length) return NextResponse.json({ error: image ? "Fotoğrafta yemek seçemedim. Daha yakından ya da üstten çekmeyi dene." : "Anlayamadım, biraz daha ayrıntı yaz." }, { status: 422 });

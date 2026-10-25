@@ -8,6 +8,7 @@ import { QUEST_IDS, SYMPTOMS } from "@/lib/cycle";
 import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
+import { EXERCISES as OLD_EXERCISES } from "@/lib/programs";
 import { BENCHMARKS, LADDERS, PLANS, netKcal, type Effort } from "@/lib/training";
 import { boundedNumber, validDate, validFood } from "@/lib/validate";
 
@@ -137,6 +138,20 @@ async function act(user: UserId, d: string, b: Body) {
       await setDaily(user, "bench", d, { ...prev, [bm.id]: v });
       return;
     }
+    case "logPlanned": {
+      // a whole planned meal in one request (no half-saved meals, no double taps)
+      const its = (Array.isArray(b.items) ? b.items : []).slice(0, 10) as { foodId?: unknown; qty?: unknown }[];
+      const entries = its.map((it) => {
+        const f = FOODS.find((x) => x.id === it.foodId);
+        if (!f) throw new Error("Yemek bulunamadı");
+        const q = num(it.qty ?? 1, 0.25, 10);
+        return { name: f.name, amount: q === 1 ? f.portion : `${q} × ${f.portion}`, kcal: Math.round(f.kcal * q), protein: Math.round(f.protein * q * 10) / 10, carbs: Math.round(f.carbs * q * 10) / 10, fat: Math.round(f.fat * q * 10) / 10 };
+      });
+      if (!entries.length) throw new Error("Boş öğün");
+      const meal = typeof b.meal === "string" ? b.meal.slice(0, 40) : undefined;
+      for (const e of entries) await add<FoodEntry>(user, "food", d, { ...e, meal, planned: true, time: nowTime(), source: "list" });
+      return;
+    }
     case "logPreset": {
       const { profile } = await getProfile(user);
       const pr = (profile.presets ?? []).find((x) => x.id === b.id);
@@ -195,7 +210,10 @@ async function act(user: UserId, d: string, b: Body) {
     case "weight": {
       // a past morning can be filled in or corrected (last 30 days)
       const date = b.date === undefined ? d : validDate(b.date, addDays(d, -30), d);
-      await setDaily(user, "weight", date, { kg: Math.round(num(b.kg, 30, 200) * 10) / 10 });
+      // a weight typed in later for a past morning counts for the trend, not for points
+      const had = (await list<{ late?: boolean }>(user, "weight", date, date))[0];
+      const late = date !== d && (!had || !!had.data.late); // correcting an on-time weigh-in keeps its points
+      await setDaily(user, "weight", date, { kg: Math.round(num(b.kg, 30, 200) * 10) / 10, ...(late ? { late: true } : {}) });
       return;
     }
     case "steps":
@@ -229,7 +247,7 @@ async function act(user: UserId, d: string, b: Body) {
         session: w.session ? String(w.session).slice(0, 4) : undefined,
         minutes: w.minutes ? num(w.minutes, 1, 300) : undefined,
         withPartner: !!w.withPartner,
-        exercises: (w.exercises ?? []).slice(0, 12).map((e) => ({
+        exercises: (Array.isArray(w.exercises) ? w.exercises : []).filter((e) => e && Object.hasOwn(OLD_EXERCISES, String(e.id))).slice(0, 12).map((e) => ({
           id: String(e.id),
           level: Math.round(num(e.level, 0, 10)),
           sets: (Array.isArray(e.sets) ? e.sets : []).slice(0, 6).map((s) => Math.round(num(s || 0, 0, 200))),
@@ -246,7 +264,7 @@ async function act(user: UserId, d: string, b: Body) {
       return;
     }
     case "toggleTodo": {
-      const recs = await list<Todo>(user, "todo", String(b.date ?? d), String(b.date ?? d));
+      const recs = await list<Todo>(user, "todo", d, d);
       const r = recs.find((x) => x.id === b.id);
       if (r) await update(user, r.id, { ...r.data, done: !r.data.done });
       return;

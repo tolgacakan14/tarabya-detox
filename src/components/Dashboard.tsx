@@ -127,12 +127,12 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
           <span />
         </div>
         <header className="relative z-10 max-w-md mx-auto px-4 pt-5 flex items-center justify-between gap-3">
-          <h1 className="display text-3xl font-bold leading-tight">
+          <h1 className="display text-[26px] font-bold leading-tight truncate min-w-0">
             Selam <span className="text-grad">{s.profile.name}</span>
           </h1>
           <div className="flex items-center gap-2">
             <DayPill />
-            <span className="chip num font-semibold" title="Toplam puan">
+            <span className="chip num font-semibold whitespace-nowrap" title="Toplam puan">
               ⭐ {s.scores.me.total.toLocaleString("tr-TR")}
             </span>
             <button
@@ -150,9 +150,9 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
 
 
         {err && (
-          <div className="max-w-md mx-auto px-4 mt-3">
-            <p className="panel !py-3" role="alert" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
-              {err}
+          <div className="fixed top-3 inset-x-0 z-[95] px-4 flex justify-center" onClick={() => setErr("")}>
+            <p className="panel !py-3 max-w-md w-full shadow-xl pop" role="alert" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+              {err} <span className="label">· kapat</span>
             </p>
           </div>
         )}
@@ -212,7 +212,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
           ))}
         </nav>
 
-        <div className="fixed top-4 inset-x-0 flex flex-col items-center gap-2 pointer-events-none z-50" aria-live="polite">
+        <div className="fixed top-4 inset-x-0 flex flex-col items-center gap-2 pointer-events-none z-[90]" aria-live="polite">
           {toasts.map((t) => (
             <div key={t.id} className="pop rounded-full px-5 py-2.5 font-bold shadow-lg grad-me text-white">
               {t.text}

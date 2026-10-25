@@ -19,6 +19,7 @@ export default function Food() {
   const gain = s.profile.goal === "gain";
   const { menu, prefs, reroll, eaten } = useMenu(s);
   const [openMeal, setOpenMeal] = useState<number | null>(null);
+  const [busyMeal, setBusyMeal] = useState<number | null>(null);
   const [more, setMore] = useState<Mode | null>(null);
   const asks = nextQuestions(prefs, 3);
 
@@ -84,11 +85,11 @@ export default function Food() {
                   <div className="flex gap-2 mt-2.5">
                     <button
                       className={`btn ${done ? "btn-ghost" : "btn-me"} flex-1 press !py-2`}
+                      disabled={busyMeal === idx}
                       onClick={async () => {
-                        for (let k = 0; k < m.items.length; k++) {
-                          const it = m.items[k];
-                          await act({ action: "addFood", foodId: it.foodId, qty: it.qty, meal: m.slot, planned: true }, k === m.items.length - 1 ? { toast: "Afiyet olsun 😋", celebrate: true } : undefined);
-                        }
+                        setBusyMeal(idx);
+                        await act({ action: "logPlanned", meal: m.slot, items: m.items.map((i) => ({ foodId: i.foodId, qty: i.qty })) }, { toast: "Afiyet olsun 😋", celebrate: true });
+                        setBusyMeal(null);
                       }}
                     >
                       {done ? "Yine yedim" : "Yedim ✓"}
@@ -97,11 +98,11 @@ export default function Food() {
                       <button
                         className="btn btn-ghost press !py-2 !px-3"
                         aria-label={`${m.slot} öğününün yarısını yedim`}
+                        disabled={busyMeal === idx}
                         onClick={async () => {
-                          for (let k = 0; k < m.items.length; k++) {
-                            const it = m.items[k];
-                            await act({ action: "addFood", foodId: it.foodId, qty: Math.max(0.25, it.qty / 2), meal: m.slot, planned: true }, k === m.items.length - 1 ? { toast: "Yarısı kaydedildi" } : undefined);
-                          }
+                          setBusyMeal(idx);
+                          await act({ action: "logPlanned", meal: m.slot, items: m.items.map((i) => ({ foodId: i.foodId, qty: Math.max(0.25, i.qty / 2) })) }, { toast: "Yarısı kaydedildi" });
+                          setBusyMeal(null);
                         }}
                       >
                         ½
