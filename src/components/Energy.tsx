@@ -18,20 +18,20 @@ export default function EnergyPanel() {
   const pEx = prevWeek.reduce((a, d) => a + d.exercise, 0);
   const sessions = week.flatMap((d) => d.sessions);
   const strength = sessions.filter((x) => x.kind === "strength").length;
-  const cardioMin = sessions.filter((x) => x.kind === "walk" || x.kind === "run" || x.kind === "custom").reduce((a, x) => a + (x.minutes ?? 0), 0);
+  const cardioMin = sessions.filter((x) => x.kind === "walk" || x.kind === "run").reduce((a, x) => a + (x.minutes ?? 0), 0);
   const prs = sessions.reduce((a, x) => a + x.prs, 0);
   const max = Math.max(...days.map((d) => d.exercise + d.stepKcal), 1);
   const day = days.find((d) => d.date === sel) ?? days[days.length - 1];
   const gain = s.profile.goal === "gain";
   const intense = s.profile.intensity !== "standard";
   const todayExtra = s.extraBurnToday;
-  const added = gain ? todayExtra : intense ? 0 : todayExtra > 250 ? Math.round(todayExtra * 0.25) : 0;
+  const added = s.engine.exerciseAdded;
 
   return (
     <section className="panel">
       <div className="flex items-baseline justify-between">
         <h2 className="display text-xl font-bold">⚡ Harcadığın enerji</h2>
-        <span className="label">bu hafta</span>
+        <span className="label">son 7 gün</span>
       </div>
       <div className="grid grid-cols-3 gap-2 mt-3">
         <div className="rounded-2xl p-2.5 text-center" style={{ background: "var(--me-soft)" }}>

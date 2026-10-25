@@ -5,12 +5,13 @@
 import { useRef, useState } from "react";
 import { useApp, fmt } from "./ui";
 import { QUICK_SIZES } from "@/lib/foods";
+import { istHour } from "@/lib/dates";
 
 type Item = { name: string; amount: string; kcal: number; protein: number; carbs: number; fat: number; low?: boolean; m?: number };
 const MULTS = [0.75, 1, 1.25, 1.5];
 
 function slotNow(): string {
-  const h = new Date().getHours();
+  const h = istHour();
   // after midnight still belongs to the evening (late sleepers)
   return h < 5 ? "akşam" : h < 11 ? "kahvaltı" : h < 15 ? "öğle" : h < 18 ? "ara öğün" : "akşam";
 }
@@ -46,6 +47,8 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
   const cam = useRef<HTMLInputElement>(null);
   const gal = useRef<HTMLInputElement>(null);
   const [rec, setRec] = useState<"idle" | "rec" | "up">("idle");
+  const [pastMeal, setPastMeal] = useState("akşam");
+  const mealFor = () => (date ? pastMeal : slotNow());
   const media = useRef<{ r: MediaRecorder; chunks: Blob[]; stop: ReturnType<typeof setTimeout> } | null>(null);
 
   // 🎤 tap to talk, tap again to stop (max 30 s). Whisper on the server understands Turkish well.
@@ -148,6 +151,15 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
     <section className="panel relative overflow-hidden">
       <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full grad-me opacity-15" aria-hidden />
       <h2 className="display text-2xl font-bold relative">{title}</h2>
+      {date && (
+        <div className="flex gap-1.5 mt-2 relative overflow-x-auto scroll-x">
+          {["kahvaltı", "öğle", "ara öğün", "akşam"].map((m) => (
+            <button key={m} className="chip press shrink-0 !text-[13px]" aria-pressed={pastMeal === m} onClick={() => setPastMeal(m)}>
+              {m[0].toLocaleUpperCase("tr") + m.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!items && (
         <>
@@ -216,7 +228,7 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
                 key={q.id}
                 className="chip press"
                 onClick={async () => {
-                  if (await act({ action: "addFood", entry: { name: q.label + " (tahmini)", amount: q.hint, kcal: q.kcal, protein: q.protein, carbs: q.carbs, fat: q.fat, source: "quick" }, meal: slotNow(), planned: false, date }, { toast: "Kaydedildi" })) {
+                  if (await act({ action: "addFood", entry: { name: q.label + " (tahmini)", amount: q.hint, kcal: q.kcal, protein: q.protein, carbs: q.carbs, fat: q.fat, source: "quick" }, meal: mealFor(), planned: false, date }, { toast: "Kaydedildi" })) {
                     reset();
                     onDone?.();
                   }
@@ -279,7 +291,7 @@ export default function QuickLog({ onDone, autoFocus = false, date, title = "Ne 
               className="btn btn-me press"
               disabled={!scaled.length}
               onClick={async () => {
-                const meal = slotNow();
+                const meal = mealFor();
                 const ok = await act(
                   { action: "addFoods", entries: scaled.map(({ low: _low, ...x }) => ({ ...x, meal, source: photo ? "photo" : "ai" })), planned: false, date },
                   { toast: `${fmt(total)} kcal kaydedildi 😋`, celebrate: true }

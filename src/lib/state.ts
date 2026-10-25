@@ -62,7 +62,9 @@ export function dayInfo(p: Profile): { date: string; pending: boolean; calendar:
   if (a > addDays(cal, 1)) a = cal;
   if (a >= cal) return { date: a, pending: false, calendar: cal, move: a !== p.activeDate ? a : undefined };
   if (hourNow() >= 14) return { date: cal, pending: false, calendar: cal, move: cal };
-  let d = a < addDays(cal, -1) ? addDays(cal, -1) : a; // at most one day behind
+  // only "yesterday" can still be going on; after a longer gap you start today
+  if (a < addDays(cal, -1)) return { date: cal < p.startDate ? p.startDate : cal, pending: false, calendar: cal, move: cal };
+  let d = a;
   if (d < p.startDate) d = p.startDate; // never before the program started
   return { date: d, pending: true, calendar: cal, move: d !== p.activeDate ? d : undefined };
 }
@@ -80,7 +82,9 @@ export async function startNewDay(user: UserId): Promise<string> {
   const { profile } = await getProfile(user);
   const cal = todayFn();
   const cur = dayInfo(profile).date;
-  const next = cur < cal ? cal : addDays(cur, 1) > addDays(cal, 1) ? addDays(cal, 1) : addDays(cur, 1);
+  // ahead of the calendar only when ending the day in the evening (18:00+), never after midnight
+  const next = cur < cal ? cal : cur === cal && hourNow() >= 18 ? addDays(cal, 1) : cur;
+  if (next === cur) return cur;
   await saveProfile(user, { ...profile, activeDate: next, dayMode: profile.dayMode ?? (manualDay(profile) ? "manual" : "calendar") });
   return next;
 }
@@ -436,7 +440,7 @@ function exerciseMemory(raw: Raw) {
 
 /** Shared daily streak: a day counts when BOTH logged ≥2 meals. A freeze bank (max 2, +1 per 7 days)
  * covers a missed day; today never breaks the streak while it's still going. */
-function coupleStreak(a: Raw, b: Raw, today: string) {
+function coupleStreak(a: Raw, b: Raw, today: string, theirToday: string) {
   const meals = (raw: Raw, d: string) => {
     const fs = raw.foods.filter((f) => f.date === d);
     return new Set(fs.map((f, i) => f.data.meal ?? `x${i}`)).size;
@@ -445,7 +449,10 @@ function coupleStreak(a: Raw, b: Raw, today: string) {
   let streak = 0,
     freezes = 0,
     best = 0;
-  for (let d = start; d < today; d = addDays(d, 1)) {
+  // a day is only judged once BOTH of us have moved past it (we may be on different days)
+  const finished = today < theirToday ? today : theirToday;
+  const latest = today > theirToday ? today : theirToday;
+  for (let d = start; d < finished; d = addDays(d, 1)) {
     if (meals(a, d) >= 2 && meals(b, d) >= 2) {
       streak++;
       if (streak % 7 === 0) freezes = Math.min(2, freezes + 1);
@@ -453,10 +460,11 @@ function coupleStreak(a: Raw, b: Raw, today: string) {
     else streak = 0;
     best = Math.max(best, streak);
   }
+  for (let d = finished; d < latest; d = addDays(d, 1)) if (meals(a, d) >= 2 && meals(b, d) >= 2) streak++; // in progress, never breaks
   const meToday = meals(a, today),
-    themToday = meals(b, today);
+    themToday = meals(b, theirToday);
   const todayDone = meToday >= 2 && themToday >= 2;
-  if (todayDone) streak++;
+  if (todayDone && today === latest) streak++;
   return { days: streak, freezes, best: Math.max(best, streak), todayDone, meToday: Math.min(2, meToday), themToday: Math.min(2, themToday) };
 }
 
@@ -582,7 +590,7 @@ export async function buildState(user: UserId) {
       partner: { name: praw.profile.name, total: them.total, week: theirWeek?.points ?? 0, completion: theirWeek?.completion ?? 0, streak: them.streak, level: levelFor(them.total), today: partnerToday.points, weeks: them.weeks.slice(-8), todayTasks: partnerToday.tasks.filter((t) => t.id !== "cycle").map((t) => ({ id: t.id.startsWith("todo:") ? "todo" : t.id, done: t.done })) },
       couple: (((myWeek?.completion ?? 0) + (theirWeek?.completion ?? 0)) / 2),
       weeksWon,
-      together: coupleStreak(raw, praw, today),
+      together: coupleStreak(raw, praw, today, pToday),
     },
     partnerProgress: {
       name: praw.profile.name,

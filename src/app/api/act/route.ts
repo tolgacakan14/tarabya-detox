@@ -107,8 +107,9 @@ async function act(user: UserId, d: string, b: Body) {
       }
       entry.meal = b.meal ? String(b.meal).slice(0, 40) : undefined;
       entry.planned = b.planned === true;
-      entry.time = nowTime();
-      await add(user, "food", pastDay(b.date, d), entry);
+      const fd0 = pastDay(b.date, d);
+      entry.time = fd0 === d ? nowTime() : undefined; // a past day's time is unknown
+      await add(user, "food", fd0, entry);
       return;
     }
     case "delete": {
@@ -126,6 +127,7 @@ async function act(user: UserId, d: string, b: Body) {
     case "dayMode": {
       const { profile } = await getProfile(user);
       if (b.mode !== "manual" && b.mode !== "calendar") throw new Error("Geçersiz değer");
+      if (b.mode === "calendar" && d > today()) throw new Error("Şu an yarının günündesin; kayıtlar kaybolmasın diye bunu yarın değiştirebilirsin.");
       await saveProfile(user, { ...profile, dayMode: b.mode, activeDate: b.mode === "calendar" ? undefined : d });
       return;
     }
@@ -238,7 +240,7 @@ async function act(user: UserId, d: string, b: Body) {
           fat: v.fat,
           meal: v.meal,
           planned: b.planned === true,
-          time: nowTime(),
+          time: fd === d ? nowTime() : undefined,
           source: (["ai", "photo", "quick", "coach", "list", "estimate"].includes(v.source ?? "") ? v.source : "quick") as FoodEntry["source"],
         });
       }

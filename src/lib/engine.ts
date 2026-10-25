@@ -89,6 +89,7 @@ export interface EngineResult {
   phase: "surplus" | "deficit" | "maintenance";
   targets: Targets;
   floor: number;
+  exerciseAdded: number; // kcal actually added to today's target for extra activity
   insights: { tone: "info" | "good" | "warn"; text: string }[];
   milestones: { label: string; weight: number; reached: boolean }[];
   week7: { date: string; intake?: number }[];
@@ -215,20 +216,23 @@ export function runEngine(
   }
   if (opts.cycleWaterWeight) insights.push({ tone: "info", text: "Bu günlerde tartıdaki artış büyük ihtimalle su tutulumu, yağ değil. Trende bak." });
 
+  kcal += p.kcalAdjust;
+  // eat-back is added on top, and what we report is what actually changed after the safety floor
+  const beforeEat = Math.max(floor, kcal);
+  if (opts.exerciseBurn && opts.exerciseBurn >= 40) kcal += opts.exerciseKcal ?? 0;
+  kcal = Math.max(floor, kcal);
+  const exerciseAdded = Math.round(kcal - beforeEat);
   if (opts.exerciseBurn && opts.exerciseBurn >= 40) {
-    kcal += opts.exerciseKcal ?? 0;
     insights.push({
       tone: "good",
       text:
         p.goal === "gain"
-          ? `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı; kilo almaya devam etmen için hedefine +${opts.exerciseKcal} kcal ekledim.`
-          : (opts.exerciseKcal ?? 0) > 0
-            ? `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı. Büyük bir seans olduğu için hedefine +${opts.exerciseKcal} kcal ekledim, gerisi yağ yakımına gidiyor.`
+          ? `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı; kilo almaya devam etmen için hedefine +${exerciseAdded} kcal ekledim.`
+          : exerciseAdded > 0
+            ? `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı. Büyük bir seans olduğu için hedefine +${exerciseAdded} kcal ekledim, gerisi yağ yakımına gidiyor.`
             : `Bugünkü ekstra aktivite ~${opts.exerciseBurn} kcal yaktı. Hedefini artırmıyorum; bu açık doğrudan yağ yakımına gidiyor.`,
     });
   }
-  kcal += p.kcalAdjust;
-  kcal = Math.max(floor, kcal);
   if (p.goal === "gain") kcal = Math.max(kcal, Math.round(tdee));
   kcal = Math.max(Math.ceil(floor / 10) * 10, Math.round(kcal / 10) * 10);
 
@@ -306,6 +310,7 @@ export function runEngine(
     adaptiveWeight: Math.round(adaptiveWeight * 100) / 100,
     loggingCompleteness: Math.round(completeness * 100) / 100,
     phase,
+    exerciseAdded,
     targets: { kcal, protein, fat, carbs, fiber: p.goal === "lose" ? 25 : 30, steps, sessionsPerWeek },
     floor,
     insights,

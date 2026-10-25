@@ -477,3 +477,24 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dance-sway, .dance-hop, .dance-groove, .dance-notes i { animation: none; }
 }
+
+/* weigh-in: aurora glow, rolling digits, ruler, ripple on save */
+.weigh-aurora { position: absolute; inset: -40% -20% auto -20%; height: 140%; pointer-events: none;
+  background: radial-gradient(40% 35% at 25% 30%, var(--me) 0%, transparent 70%), radial-gradient(35% 30% at 80% 20%, var(--me-2, var(--me)) 0%, transparent 70%);
+  opacity: 0.16; filter: blur(18px); animation: aurora 14s ease-in-out infinite alternate; }
+@keyframes aurora { 0% { transform: translate3d(-4%, 0, 0) scale(1); } 100% { transform: translate3d(6%, 4%, 0) scale(1.12); } }
+.roll-digit { display: inline-block; animation: roll-in 0.5s cubic-bezier(.2, .9, .25, 1.2) both; }
+@keyframes roll-in { 0% { transform: translateY(60%); opacity: 0; filter: blur(3px); } 100% { transform: none; opacity: 1; filter: none; } }
+.weigh-input { width: 3.7ch; font-size: 64px; line-height: 1; caret-color: var(--me); }
+.ruler { scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+.ruler::-webkit-scrollbar { display: none; }
+.ribbon-draw { stroke-dasharray: 600; stroke-dashoffset: 600; animation: ribbon 1.4s cubic-bezier(.3, .7, .2, 1) 0.15s forwards; }
+@keyframes ribbon { to { stroke-dashoffset: 0; } }
+.weigh-pop { animation: weigh-pop 0.6s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes weigh-pop { 0% { transform: scale(0.97); } 100% { transform: none; } }
+.weigh-ripple { position: absolute; left: 22%; top: 30%; width: 20px; height: 20px; border-radius: 999px; border: 3px solid var(--me);
+  animation: ripple 1.4s ease-out forwards; pointer-events: none; }
+@keyframes ripple { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(22); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .weigh-aurora, .roll-digit, .ribbon-draw, .weigh-pop, .weigh-ripple { animation: none; stroke-dashoffset: 0; }
+}

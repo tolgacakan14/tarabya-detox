@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useApp, fmt } from "./ui";
+import { istHour } from "@/lib/dates";
 
 const dayName = (d: string) => new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(d + "T12:00:00Z"));
 
@@ -11,7 +12,9 @@ export function DayBar() {
   const [later, setLater] = useState(false);
   const [sheet, setSheet] = useState(false);
   if (!s.day.manual) return null;
-  const hour = new Date().getHours();
+  const hour = istHour();
+  // already on a day ahead of the calendar, or past midnight on the calendar day: nothing to end yet
+  const canEnd = !(s.today > s.day.calendar || (s.today === s.day.calendar && hour < 5));
   const t = s.engine.targets;
   const kcal = s.totals.kcal;
   const prot = s.totals.protein;
@@ -81,7 +84,7 @@ export function DayBar() {
       </section>
     );
   }
-  if (hour >= 20 || hour < 5) {
+  if (canEnd && (hour >= 20 || hour < 5)) {
     return (
       <>
         {summary}

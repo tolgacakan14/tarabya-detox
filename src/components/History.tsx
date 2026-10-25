@@ -18,6 +18,9 @@ export default function History() {
   const [day, setDay] = useState<Day | null>(null);
   const [adding, setAdding] = useState(false);
   const gain = s.profile.goal === "gain";
+  // same rule as the daily score: gainer ≥95% of target; loser between the floor and +5% (+10% standard)
+  const hiF = s.profile.intensity === "standard" ? 1.1 : 1.05;
+  const inTarget = (kcal: number, t?: number) => (t ? (gain ? kcal >= t * 0.95 : kcal >= Math.max(s.engine.floor, t * 0.85) && kcal <= t * hiF) : false);
 
   const load = useCallback(async (d: string) => {
     setDay(null);
@@ -34,7 +37,7 @@ export default function History() {
 
   const max = Math.max(...days.map((d) => Math.max(d.kcal, d.target ?? 0)), 1);
   const logged = days.filter((d) => d.items > 0 && d.date < s.today);
-  const inRange = logged.filter((d) => d.target && (gain ? d.kcal >= d.target * 0.95 : d.kcal <= d.target * 1.05 && d.kcal >= d.target * 0.8)).length;
+  const inRange = logged.filter((d) => inTarget(d.kcal, d.target)).length;
   const avg = logged.length ? Math.round(logged.reduce((a, d) => a + d.kcal, 0) / logged.length) : 0;
   const total = day?.foods.reduce((a, f) => a + f.kcal, 0) ?? 0;
   const prot = day?.foods.reduce((a, f) => a + (f.protein || 0), 0) ?? 0;
@@ -49,7 +52,7 @@ export default function History() {
       </div>
       {logged.length > 0 && (
         <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>
-          Ortalama <b style={{ color: "var(--ink)" }}>{fmt(avg)} kcal</b> · {logged.length} günün {inRange}&apos;inde hedefteydin
+          Ortalama <b style={{ color: "var(--ink)" }}>{fmt(avg)} kcal</b> · hedefte geçen gün: <b style={{ color: "var(--ink)" }}>{inRange}/{logged.length}</b>
         </p>
       )}
 
@@ -58,7 +61,7 @@ export default function History() {
         {days.map((d) => {
           const h = Math.round((d.kcal / max) * 100);
           const th = d.target ? Math.round((d.target / max) * 100) : null;
-          const ok = d.target ? (gain ? d.kcal >= d.target * 0.95 : d.kcal <= d.target * 1.05) : true;
+          const ok = d.target ? inTarget(d.kcal, d.target) : true;
           const isSel = d.date === sel;
           return (
             <button key={d.date} className="relative flex-1 h-full flex flex-col justify-end items-center press" onClick={() => setSel(d.date)} aria-pressed={isSel} aria-label={`${dLong(d.date)}: ${d.kcal} kcal`}>
@@ -110,8 +113,8 @@ export default function History() {
                   if (!fs.length) return null;
                   return (
                     <div key={m ?? "other"}>
-                      <p className="label capitalize">
-                        {m ?? "diğer"} · {fmt(fs.reduce((a, f) => a + f.kcal, 0))} kcal
+                      <p className="label">
+                        {(m ?? "diğer").replace(/^./, (c) => c.toLocaleUpperCase("tr"))} · {fmt(fs.reduce((a, f) => a + f.kcal, 0))} kcal
                       </p>
                       <ul className="mt-0.5">
                         {fs.map((f) => (

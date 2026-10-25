@@ -8,6 +8,11 @@ export function nowTime(): string {
   return new Intl.DateTimeFormat("tr-TR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(new Date());
 }
 
+/** Istanbul hour on any device (client or server). */
+export function istHour(d = new Date()): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }).format(d)) % 24;
+}
+
 export function hourNow(): number {
   return Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }).format(new Date()));
 }

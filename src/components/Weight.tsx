@@ -1,11 +1,134 @@
 "use client";
 // Weigh-in + weight charts for both of us. Daily weights are noisy (water, salt, food in the gut, cycle),
 // so the line we judge by is the smoothed trend; dots are the raw scale readings.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp, kg } from "./ui";
 import { addDays } from "@/lib/dates";
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
+
+/** Rolling digits: each character slides into place when the value changes. */
+function Roll({ text, className = "" }: { text: string; className?: string }) {
+  return (
+    <span className={`inline-flex num ${className}`} aria-label={text}>
+      {text.split("").map((c, i) => (
+        <span key={`${i}-${c}`} className="roll-digit" style={{ animationDelay: `${i * 35}ms` }} aria-hidden>
+          {c}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** A scale ruler you swipe like a real dial: 0.1 kg per tick, snaps, haptic tick every 0.5 kg. */
+function Ruler({ value, onChange, min, max }: { value: number; onChange: (v: number) => void; min: number; max: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const STEP = 12; // px per 0.1 kg
+  const n = Math.round((max - min) * 10);
+  const last = useRef(value);
+  const syncing = useRef(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const target = Math.round((value - min) * 10) * STEP;
+    if (Math.abs(el.scrollLeft - target) > STEP / 2) {
+      syncing.current = true;
+      el.scrollLeft = target;
+      requestAnimationFrame(() => (syncing.current = false));
+    }
+  }, [value, min]);
+  return (
+    <div className="relative mt-3 select-none">
+      <div
+        ref={ref}
+        className="ruler overflow-x-auto scroll-x"
+        style={{ scrollSnapType: "x mandatory" }}
+        onScroll={(e) => {
+          if (syncing.current) return;
+          const v = Math.round((min + Math.round(e.currentTarget.scrollLeft / STEP) / 10) * 10) / 10;
+          if (v !== last.current) {
+            if (Math.round(v * 2) !== Math.round(last.current * 2)) navigator.vibrate?.(4);
+            last.current = v;
+            onChange(Math.min(max, Math.max(min, v)));
+          }
+        }}
+        role="slider"
+        aria-label="Kiloyu kaydırarak ayarla"
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight") onChange(Math.min(max, round1(value + 0.1)));
+          if (e.key === "ArrowLeft") onChange(Math.max(min, round1(value - 0.1)));
+        }}
+      >
+        <div className="flex items-end h-16" style={{ paddingLeft: "50%", paddingRight: "50%", width: "max-content" }}>
+          {Array.from({ length: n + 1 }, (_, i) => {
+            const kgv = min + i / 10;
+            const major = i % 10 === 0,
+              half = i % 5 === 0;
+            const dist = Math.abs(kgv - value);
+            return (
+              <div key={i} className="relative shrink-0 flex justify-center" style={{ width: STEP, scrollSnapAlign: "center" }}>
+                <span
+                  className="block rounded-full"
+                  style={{ width: major ? 3 : 2, height: major ? 34 : half ? 24 : 14, background: "var(--ink)", opacity: Math.max(0.15, 1 - dist / 2.2) }}
+                />
+                {major && (
+                  <span className="absolute -top-4 text-[11px] font-bold num" style={{ opacity: Math.max(0.25, 1 - dist / 3) }}>
+                    {Math.round(kgv)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {/* center needle + fades */}
+      <div className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-end">
+        <span className="w-[5px] h-12 rounded-full grad-me shadow-[0_0_12px_var(--me)]" />
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-16" style={{ background: "linear-gradient(90deg, var(--paper, #fff), transparent)" }} />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-16" style={{ background: "linear-gradient(270deg, var(--paper, #fff), transparent)" }} />
+    </div>
+  );
+}
+
+/** 14-day trend ribbon: soft gradient band = daily noise, bold line = trend. */
+function Ribbon({ pts, height = 54 }: { pts: { date: string; weight: number; trend: number }[]; height?: number }) {
+  if (pts.length < 2) return null;
+  const W = 320,
+    H = height;
+  const vals = pts.flatMap((p) => [p.weight, p.trend]);
+  const lo = Math.min(...vals) - 0.2,
+    hi = Math.max(...vals) + 0.2;
+  const x = (i: number) => (i / (pts.length - 1)) * W;
+  const y = (v: number) => H - 4 - ((v - lo) / (hi - lo || 1)) * (H - 8);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.trend).toFixed(1)}`).join(" ");
+  const area = `${line} L${W} ${H} L0 ${H} Z`;
+  const last = pts[pts.length - 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-2" aria-hidden>
+      <defs>
+        <linearGradient id="ribbonFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="var(--me)" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="var(--me)" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="ribbonLine" x1="0" x2="1">
+          <stop offset="0%" stopColor="var(--me-2, var(--me))" />
+          <stop offset="100%" stopColor="var(--me)" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#ribbonFill)" />
+      {pts.map((p, i) => (
+        <circle key={p.date} cx={x(i)} cy={y(p.weight)} r="2.2" fill="var(--me)" opacity="0.3" />
+      ))}
+      <path d={line} fill="none" stroke="url(#ribbonLine)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="ribbon-draw" />
+      <circle cx={x(pts.length - 1)} cy={y(last.trend)} r="4.5" fill="var(--me)" stroke="#fff" strokeWidth="2" className="cycle-pulse" />
+    </svg>
+  );
+}
 
 export function WeighIn() {
   const { s, act } = useApp();
@@ -15,17 +138,23 @@ export function WeighIn() {
   const [date, setDate] = useState(s.today);
   const [w, setW] = useState<number>(s.weighedToday ?? s.lastWeight ?? s.profile.startWeight);
   const [typed, setTyped] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
 
   const open = !s.weighedToday || editing;
   const parsed = typed !== null ? Number(typed.replace(",", ".")) : w;
   const value = Number.isFinite(parsed) ? parsed : w;
   const valid = Number.isFinite(parsed) && parsed >= 30 && parsed <= 200;
+  const center = s.engine.trend.length ? s.engine.currentWeight : s.profile.startWeight;
+  const rMin = Math.max(30, Math.floor(center - 8)),
+    rMax = Math.min(200, Math.ceil(center + 8));
   const pick = (d: string) => {
     setDate(d);
     setTyped(null);
     const known = log.find((x) => x.date === d)?.kg;
     if (known) setW(known);
   };
+  const recent = s.engine.trend.slice(-14);
+  const goalDir = s.profile.goal === "gain" ? 1 : -1;
 
   async function save() {
     if (!valid) return;
@@ -40,75 +169,116 @@ export function WeighIn() {
       setEditing(false);
       setTyped(null);
       setDate(s.today);
+      setJustSaved(true);
+      navigator.vibrate?.([10, 40, 10]);
+      setTimeout(() => setJustSaved(false), 2400);
     }
   }
 
   if (!open) {
     const delta = yesterday ? round1(s.weighedToday! - yesterday.kg) : null;
+    const rate = s.engine.weeklyRate;
+    const onTrack = rate !== null && rate * goalDir > 0.05;
     return (
-      <section className="panel !py-3">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl" aria-hidden>
-            ⚖️
-          </span>
+      <section className={`panel weigh-card relative overflow-hidden ${justSaved ? "weigh-pop" : ""}`}>
+        <div className="weigh-aurora" aria-hidden />
+        {justSaved && <span className="weigh-ripple" aria-hidden />}
+        <div className="relative flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="font-bold">
-              Trend <span className="num">{kg(s.engine.currentWeight)}</span> kg
-              {s.engine.weeklyRate !== null && (
-                <span className="label num">
-                  {" "}
-                  · haftada {s.engine.weeklyRate > 0 ? "+" : ""}
-                  {kg(s.engine.weeklyRate)}
+            <p className="label">Trend kilon</p>
+            <p className="display font-bold leading-none mt-0.5">
+              <Roll text={kg(s.engine.currentWeight)} className="text-5xl text-grad" />
+              <span className="text-lg ml-1">kg</span>
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {rate !== null && (
+                <span className="text-[12px] font-bold rounded-full px-2.5 py-1" style={{ background: onTrack ? "var(--me)" : "var(--line)", color: onTrack ? "#fff" : "var(--ink)" }}>
+                  {rate > 0 ? "↗ +" : rate < 0 ? "↘ " : "→ "}
+                  {kg(rate)} kg/hafta
                 </span>
               )}
-            </p>
-            <p className="label">
-              Tartı <span className="num">{kg(s.weighedToday!)}</span> kg
-              {delta !== null && delta !== 0 ? ` (dünden ${delta > 0 ? "+" : ""}${kg(delta)})` : ""}
-              {Math.abs(s.weighedToday! - s.engine.currentWeight) > 0.5
-                ? s.cycle?.waterWeightLikely
-                  ? ". Döngüden su tutulumu olabilir, trend neredeyse kımıldamadı."
-                  : ". Tek günlük oynama; trend neredeyse kımıldamadı."
-                : ""}
-            </p>
+              <span className="text-[12px] font-semibold rounded-full px-2.5 py-1" style={{ background: "var(--line)" }}>
+                ⚖️ tartı {kg(s.weighedToday!)}
+                {delta !== null && delta !== 0 ? ` (${delta > 0 ? "+" : ""}${kg(delta)})` : ""}
+              </span>
+            </div>
           </div>
-          <button className="chip press" onClick={() => setEditing(true)}>
+          <button className="chip press shrink-0" onClick={() => setEditing(true)}>
             Düzelt
           </button>
         </div>
+        <div className="relative">
+          <Ribbon pts={recent} />
+        </div>
+        <p className="relative label mt-1">
+          {Math.abs(s.weighedToday! - s.engine.currentWeight) > 0.5
+            ? s.cycle?.waterWeightLikely
+              ? "Döngüden su tutulumu olabilir; trend neredeyse kımıldamadı."
+              : "Tek günlük oynama; kararı çizgi verir, nokta değil."
+            : onTrack
+              ? s.profile.goal === "gain"
+                ? "Çizgi yukarı, tam istediğimiz gibi 💪"
+                : "Çizgi aşağı, harika gidiyorsun 🔥"
+              : "Noktalar günlük tartı, çizgi gerçek yönün."}
+        </p>
       </section>
     );
   }
 
   return (
-    <section className="panel">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="display text-xl font-bold">⚖️ Tartıldın mı?</h2>
+    <section className="panel weigh-card relative overflow-hidden">
+      <div className="weigh-aurora" aria-hidden />
+      <div className="relative flex items-baseline justify-between gap-2">
+        <div>
+          <h2 className="display text-xl font-bold">Tartıldın mı?</h2>
+          <p className="label">Sabah, tuvaletten sonra, kahvaltıdan önce.</p>
+        </div>
         {editing && (
           <button className="label underline" onClick={() => setEditing(false)}>
             Vazgeç
           </button>
         )}
       </div>
-      <p className="label mt-0.5">Sabah, tuvaletten sonra, kahvaltıdan önce. Her gün aynı koşulda.</p>
-      <div className="flex items-center gap-3 mt-3">
-        <button className="btn btn-ghost !w-14 !h-14 !p-0 text-2xl press" onClick={() => { setTyped(null); setW(round1(value - 0.1)); }} aria-label="0,1 kg azalt">
-          −
-        </button>
-        <input
-          className="field num display !text-4xl font-bold text-center !py-2 flex-1 min-w-0"
-          inputMode="decimal"
-          aria-label="Kilo (kg)"
-          value={typed ?? kg(w)}
-          onFocus={(e) => e.target.select()}
-          onChange={(e) => setTyped(e.target.value.replace(/[^\d.,]/g, "").slice(0, 5))}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-        />
-        <button className="btn btn-ghost !w-14 !h-14 !p-0 text-2xl press" onClick={() => { setTyped(null); setW(round1(value + 0.1)); }} aria-label="0,1 kg artır">
-          +
-        </button>
+
+      <div className="relative text-center mt-4">
+        <label className="inline-flex items-baseline justify-center gap-1">
+          <input
+            className="weigh-input display num font-bold text-center bg-transparent outline-none text-grad"
+            inputMode="decimal"
+            aria-label="Kilo (kg)"
+            value={typed ?? kg(w)}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setTyped(e.target.value.replace(/[^\d.,]/g, "").slice(0, 5))}
+            onBlur={() => {
+              if (typed !== null && valid) {
+                setW(round1(parsed));
+                setTyped(null);
+              }
+            }}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+          />
+          <span className="text-xl font-bold">kg</span>
+        </label>
+        {s.engine.trend.length > 0 && (
+          <p className="label num">
+            trend {kg(s.engine.currentWeight)} · fark {value - s.engine.currentWeight > 0 ? "+" : ""}
+            {kg(round1(value - s.engine.currentWeight))}
+          </p>
+        )}
       </div>
-      <div className="flex gap-2 mt-2 overflow-x-auto scroll-x">
+
+      <Ruler
+        value={value}
+        min={rMin}
+        max={rMax}
+        onChange={(v) => {
+          setTyped(null);
+          setW(v);
+        }}
+      />
+      <p className="label text-center mt-1">← kaydır ya da sayıya dokunup yaz →</p>
+
+      <div className="relative flex gap-2 mt-3 overflow-x-auto scroll-x">
         {[0, 1, 2, 3, 4, 5, 6].map((back) => {
           const d = addDays(s.today, -back);
           const day = new Intl.DateTimeFormat("tr-TR", { weekday: "long", timeZone: "UTC" }).format(new Date(d + "T12:00:00Z"));
@@ -121,7 +291,7 @@ export function WeighIn() {
           );
         })}
       </div>
-      <button className="btn btn-me w-full mt-3 press" disabled={!valid} onClick={save}>
+      <button className="btn btn-me w-full mt-3 press !py-4 text-lg relative" disabled={!valid} onClick={save}>
         Kaydet
       </button>
     </section>
