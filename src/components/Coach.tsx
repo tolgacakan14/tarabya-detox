@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "./ui";
 import Avatar from "./Avatar";
+import QuickLog from "./QuickLog";
 
 type Msg = { id?: string; role: "user" | "assistant"; content: string };
 
@@ -16,6 +17,7 @@ export default function Coach() {
   const [ai, setAi] = useState(true);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [plate, setPlate] = useState(false);
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,6 +97,16 @@ export default function Coach() {
       </div>
 
       <div className="border-t px-3 pt-2 pb-3" style={{ borderColor: "var(--line)" }}>
+        {plate && (
+          <div className="mb-2 max-h-[60dvh] overflow-y-auto">
+            <QuickLog
+              onDone={() => {
+                setPlate(false);
+                send("Az önce yediğimi kaydettim. Günün geri kalanı için ne önerirsin?");
+              }}
+            />
+          </div>
+        )}
         <div className="flex gap-2 scroll-x max-w-full min-w-0 pb-2">
           {STARTERS[s.profile.goal].map((x) => (
             <button key={x} className="chip whitespace-nowrap !text-[13px] !py-1.5 press" onClick={() => send(x)} disabled={busy}>
@@ -109,6 +121,9 @@ export default function Coach() {
             send(text);
           }}
         >
+          <button type="button" className="btn btn-ghost !rounded-full !w-12 !h-12 !p-0 shrink-0 press" onClick={() => setPlate(!plate)} aria-label="Tabak fotoğrafı ile yemek ekle" aria-pressed={plate}>
+            {plate ? "✕" : "📷"}
+          </button>
           <input className="field !rounded-full !py-3 text-[16px]" value={text} onChange={(e) => setText(e.target.value)} placeholder="Bir şey yaz…" aria-label="Mesaj" enterKeyHint="send" />
           <button className="btn btn-me !rounded-full !w-12 !h-12 !p-0 shrink-0 press" disabled={busy || !text.trim()} aria-label="Gönder">
             ➤

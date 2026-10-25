@@ -12,7 +12,7 @@ export interface FoodEntry {
   planned?: boolean;
   amount?: string;
   time?: string;
-  source?: "list" | "estimate" | "ai" | "quick" | "coach";
+  source?: "list" | "estimate" | "ai" | "quick" | "coach" | "photo";
 }
 
 export interface DayPoint {

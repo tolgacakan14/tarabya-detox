@@ -1,4 +1,5 @@
 "use client";
+import QuickLog from "./QuickLog";
 import { useMemo, useState } from "react";
 import { useApp, Bar, Section, fmt } from "./ui";
 import { FOODS, QUICK_SIZES, searchFoods } from "@/lib/foods";
@@ -21,6 +22,7 @@ export default function Food() {
   return (
     <div className="grid grid-cols-1 gap-4 items-start">
       <div className="space-y-4">
+        <QuickLog />
         <section className="panel">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="display text-2xl font-bold">Senin menün</h2>
@@ -108,7 +110,6 @@ export default function Food() {
       </div>
 
       <div className="space-y-4">
-        <AiEstimate />
 
         {(s.favorites.length > 0 || s.yesterdayFoods.length > 0) && (
           <Section title="Tek dokunuşla">
@@ -191,79 +192,6 @@ export default function Food() {
         {more === "manual" && <Manual />}
       </div>
     </div>
-  );
-}
-
-function AiEstimate() {
-  const { act } = useApp();
-  const [text, setText] = useState("");
-  const [items, setItems] = useState<Item[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  return (
-    <Section title="Plansız ne yedin?">
-      <p className="text-sm mb-3" style={{ color: "var(--ink-2)" }}>
-        Normal konuşur gibi yaz, kalorisini ve proteinini ben hesaplayayım. Örnek: “öğlen dışarıda tavuk dürüm ve ayran içtim, akşama doğru 2 dilim baklava”.
-      </p>
-      <textarea className="field min-h-24" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ne yedin, ne kadar?" />
-      <button
-        className="btn btn-me mt-2"
-        disabled={!text.trim() || busy}
-        onClick={async () => {
-          setBusy(true);
-          setErr("");
-          const r = await fetch("/api/estimate", { method: "POST", body: JSON.stringify({ text }) });
-          const j = await r.json();
-          setBusy(false);
-          if (!r.ok) setErr(j.error === "AI anahtarı tanımlı değil" ? "Koç henüz bağlı değil. O zamana kadar Hızlı tahmin ya da Listeden seç kullan." : j.error);
-          else setItems(j.items);
-        }}
-      >
-        {busy ? "Hesaplanıyor…" : "Hesapla"}
-      </button>
-      {err && <p className="mt-2 text-sm" style={{ color: "var(--warn)" }}>{err}</p>}
-      {items && (
-        <div className="mt-4">
-          <ul className="space-y-2">
-            {items.map((it, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <div className="flex-1">
-                  <p className="font-semibold">{it.name}</p>
-                  <p className="label">{it.amount}</p>
-                </div>
-                <input
-                  className="field num !w-24 text-right"
-                  inputMode="numeric"
-                  value={it.kcal}
-                  aria-label={`${it.name} kalori`}
-                  onChange={(e) => setItems(items.map((x, k) => (k === i ? { ...x, kcal: Number(e.target.value) || 0 } : x)))}
-                />
-                <span className="label">kcal</span>
-              </li>
-            ))}
-          </ul>
-          <p className="num text-sm mt-2">
-            Toplam {items.reduce((a, x) => a + x.kcal, 0)} kcal, {Math.round(items.reduce((a, x) => a + x.protein, 0))} g protein
-          </p>
-          <div className="flex gap-2 mt-3">
-            <button
-              className="btn btn-me"
-              onClick={async () => {
-                for (const it of items) await act({ action: "addFood", entry: { ...it, source: "ai" }, planned: false });
-                setItems(null);
-                setText("");
-              }}
-            >
-              Hepsini kaydet
-            </button>
-            <button className="btn btn-ghost" onClick={() => setItems(null)}>
-              Vazgeç
-            </button>
-          </div>
-        </div>
-      )}
-    </Section>
   );
 }
 

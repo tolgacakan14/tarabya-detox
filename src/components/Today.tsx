@@ -1,4 +1,5 @@
 "use client";
+import QuickLog from "./QuickLog";
 // Home: deliberately simple. Where am I (kg + progress bar), today's three rings, and the one next thing to do.
 import { useState } from "react";
 import { useApp, fmt, kg } from "./ui";
@@ -31,6 +32,7 @@ export default function Today() {
     <div className="grid grid-cols-1 gap-4 items-start">
       <div className="space-y-4">
         <ProgressHero />
+        <QuickLog />
         <RingsCard />
       </div>
       <div className="space-y-4">

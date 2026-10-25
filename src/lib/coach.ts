@@ -1,6 +1,6 @@
 // AI diet & training coach. Talks in Turkish, motivational-interviewing style,
 // and updates the plan through tools. Every change passes engine guardrails.
-import { runChat, extract, hasAI, type ToolDef } from "./llm";
+import { runChat, extract, extractVision, hasAI, type ToolDef } from "./llm";
 import { add, list, setDaily, type UserId } from "./store";
 import { buildState, getProfile, saveProfile, type WorkoutLog } from "./state";
 import { clampKcalAdjust, clampTargetWeight, type FoodEntry } from "./engine";
@@ -408,26 +408,42 @@ export async function chat(user: UserId, message: string): Promise<{ reply: stri
 }
 
 /** Parses a free-text description of an unplanned meal into items with nutrition. */
-export async function estimateFood(text: string): Promise<FoodEntry[]> {
+const FOOD_SYSTEM =
+  "Sen bir Türk diyetisyenisin. Yemekleri kalemlere ayır ve her biri için gerçekçi kalori ve makro tahmini yap. Türkiye'deki tipik restoran/ev porsiyonlarını kullan. Büyük porsiyonları küçük tahmin etme (yapay zeka tahminleri büyük porsiyonları sistematik olarak düşük buluyor; bunu telafi et). Porsiyon belirtilmemişse orta porsiyon varsay. Yağda pişen yemeklerin yağını hesaba kat.";
+
+const FOOD_TOOL = {
+  name: "food_items",
+  description: "Tahmin edilen yemek kalemleri",
+  input_schema: { type: "object", properties: { items: { type: "array", items: foodItemSchema } }, required: ["items"] },
+};
+
+function cleanItems(out: Record<string, unknown>): FoodEntry[] {
+  return (((out as { items?: FoodEntry[] }).items ?? []) as FoodEntry[])
+    .slice(0, 12)
+    .map((i) => ({
+      name: String(i.name ?? "Yemek").slice(0, 80),
+      amount: String(i.amount ?? "").slice(0, 60),
+      kcal: Math.min(5000, Math.max(0, Math.round(Number(i.kcal) || 0))),
+      protein: Math.min(400, Math.max(0, Math.round((Number(i.protein) || 0) * 10) / 10)),
+      carbs: Math.min(800, Math.max(0, Math.round((Number(i.carbs) || 0) * 10) / 10)),
+      fat: Math.min(400, Math.max(0, Math.round((Number(i.fat) || 0) * 10) / 10)),
+    }))
+    .filter((i) => i.name.trim());
+}
+
+export async function estimateFood(text: string, image?: string): Promise<FoodEntry[]> {
   if (!hasAI()) throw new Error("AI anahtarı tanımlı değil");
-  const out = await extract(
-    "Sen bir Türk diyetisyenisin. Kullanıcının yazdığı yemekleri kalemlere ayır ve her biri için gerçekçi kalori ve makro tahmini yap. Türkiye'deki tipik restoran/ev porsiyonlarını kullan. Büyük porsiyonları küçük tahmin etme. Porsiyon belirtilmemişse orta porsiyon varsay.",
-    text,
-    {
-      name: "food_items",
-      description: "Tahmin edilen yemek kalemleri",
-      input_schema: { type: "object", properties: { items: { type: "array", items: foodItemSchema } }, required: ["items"] },
-    }
-  );
-  const items = ((out as { items?: FoodEntry[] }).items ?? []).map((i) => ({
-    name: String(i.name),
-    amount: String(i.amount ?? ""),
-    kcal: Math.round(Number(i.kcal) || 0),
-    protein: Math.round((Number(i.protein) || 0) * 10) / 10,
-    carbs: Math.round((Number(i.carbs) || 0) * 10) / 10,
-    fat: Math.round((Number(i.fat) || 0) * 10) / 10,
-  }));
-  return items;
+  if (image) {
+    const out = await extractVision(
+      FOOD_SYSTEM +
+        " Fotoğraftaki her yemeği ayrı kalem yap. Porsiyonu tabak (yaklaşık 26 cm), kase, çatal-kaşık ve bardak boyutuna göre gram olarak tahmin et ve amount alanına yaz (örn. '1 tabak, ~250 g'). Göremediğin yağ/sos için makul pay ekle. Emin olmadığın bir yemeği en olası Türk yemeği olarak adlandır.",
+      text,
+      image,
+      FOOD_TOOL
+    );
+    return cleanItems(out);
+  }
+  return cleanItems(await extract(FOOD_SYSTEM, text, FOOD_TOOL));
 }
 
 export async function history(user: UserId) {

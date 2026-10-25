@@ -183,3 +183,107 @@ export async function extract(system: string, user: string, tool: ToolDef): Prom
   });
   return result;
 }
+
+/* ---------------- vision (photo of a plate) ---------------- */
+
+const VISION_PREF: Record<string, string[]> = {
+  groq: ["meta-llama/llama-4-maverick-17b-128e-instruct", "meta-llama/llama-4-scout-17b-16e-instruct"],
+  gemini: ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+};
+const visionChosen: Record<string, string> = {};
+
+async function pickVisionModel(p: Provider): Promise<string | null> {
+  const override = p.name === "groq" ? process.env.GROQ_VISION_MODEL : process.env.GEMINI_MODEL;
+  if (override) return override;
+  if (visionChosen[p.name]) return visionChosen[p.name];
+  try {
+    const r = await fetch(`${p.base}/models`, { headers: { Authorization: `Bearer ${p.key}` } });
+    if (r.ok) {
+      const ids = (((await r.json()) as { data?: { id: string }[] }).data ?? []).map((m) => m.id.replace(/^models\//, ""));
+      const hit = VISION_PREF[p.name].find((m) => ids.includes(m)) ?? ids.find((m) => (p.name === "groq" ? /llama-4|vision|scout|maverick|-vl/i.test(m) : /flash/.test(m) && !/image|tts|audio|live|embed/.test(m)));
+      if (hit) return (visionChosen[p.name] = hit);
+    }
+  } catch {
+    /* ignore */
+  }
+  return VISION_PREF[p.name][0] ?? null;
+}
+
+function jsonFromText(t: string): Record<string, unknown> {
+  const m = t.match(/\{[\s\S]*\}/);
+  if (!m) return {};
+  try {
+    return JSON.parse(m[0]);
+  } catch {
+    return {};
+  }
+}
+
+/** Structured extraction from an image (data URL) + optional text. */
+export async function extractVision(system: string, text: string, imageDataUrl: string, tool: ToolDef): Promise<Record<string, unknown>> {
+  const p = provider();
+  if (p) {
+    const model = await pickVisionModel(p);
+    if (!model) throw new Error("Görsel tanıyan model bulunamadı");
+    const r = await fetch(`${p.base}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        max_tokens: 900,
+        tools: [{ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.input_schema } }],
+        tool_choice: { type: "function", function: { name: tool.name } },
+        messages: [
+          { role: "system", content: system + `\nSonucu ${tool.name} aracıyla ver.` },
+          { role: "user", content: [{ type: "text", text: text || "Bu tabakta ne var? Yemekleri ve porsiyonları çıkar." }, { type: "image_url", image_url: { url: imageDataUrl } }] },
+        ],
+      }),
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      delete visionChosen[p.name];
+      if (r.status === 429) throw new Error("Ücretsiz kota şu an dolu, birkaç dakika sonra tekrar dene.");
+      throw new Error(`${p.name} ${r.status}: ${body.slice(0, 160)}`);
+    }
+    const j = (await r.json()) as { choices: { message: { content: string | null; tool_calls?: { function: { arguments: string } }[] } }[] };
+    const msg = j.choices[0]?.message;
+    const args = msg?.tool_calls?.[0]?.function.arguments;
+    if (args) {
+      try {
+        return JSON.parse(args);
+      } catch {
+        /* fall through to text */
+      }
+    }
+    return jsonFromText(msg?.content ?? "");
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic();
+    const m = imageDataUrl.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/);
+    if (!m) throw new Error("Geçersiz görsel");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res: any = await client.messages.create({
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
+      max_tokens: 900,
+      system,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tools: [tool as any],
+      tool_choice: { type: "tool", name: tool.name },
+      messages: [
+        {
+          role: "user",
+          content: [
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            { type: "image", source: { type: "base64", media_type: m[1] as any, data: m[2] } },
+            { type: "text", text: text || "Bu tabakta ne var?" },
+          ],
+        },
+      ],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.content.find((c: any) => c.type === "tool_use")?.input as Record<string, unknown>) ?? {};
+  }
+  throw new Error("AI anahtarı tanımlı değil");
+}

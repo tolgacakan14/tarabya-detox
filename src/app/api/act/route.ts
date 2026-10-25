@@ -157,7 +157,7 @@ async function act(user: UserId, d: string, b: Body) {
           meal: v.meal,
           planned: b.planned === true,
           time: nowTime(),
-          source: "quick",
+          source: (["ai", "photo", "quick", "coach", "list", "estimate"].includes(v.source ?? "") ? v.source : "quick") as FoodEntry["source"],
         });
       }
       return;
