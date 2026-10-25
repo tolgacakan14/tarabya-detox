@@ -1,4 +1,6 @@
 "use client";
+import { useContext, useState } from "react";
+import { AppCtx } from "./ui";
 // Memoji-style soft-3D portraits of Tolga and Eylül in a round, colourful frame (SVG).
 // Volume comes from gradients, not outlines. Expression follows today's completion;
 // a level badge sits on the frame. Faces/bodies never change with weight: rewards are about effort.
@@ -26,7 +28,7 @@ const SKIN = {
   eylul: { hi: "#fff0e6", base: "#f6cbb3", lo: "#dc9d82", ear: "#efbca2", blush: "#ff8f97" },
 };
 
-export default function Avatar({ who, mood = "happy", level = 1, size = 160, className = "", bob = true }: Props) {
+export function MemojiAvatar({ who, mood = "happy", level = 1, size = 160, className = "", bob = true }: Props) {
   const id = `${who}${mood}${size}`.replace(/\W/g, "");
   const s = SKIN[who];
   const bg = who === "tolga" ? ["#ffd166", "#ff9f1c"] : ["#7be0d0", "#2ec4b6"];
@@ -364,5 +366,47 @@ function EylulMouth({ mood }: { mood: Mood }) {
       <path d={`M${100 - w} ${131 - up} Q100 136.4 ${100 + w} ${131 - up}`} stroke="#9e3d4b" strokeWidth="1.6" fill="none" strokeLinecap="round" />
       <ellipse cx="100" cy="139" rx="5" ry="1.6" fill="#fff" opacity="0.45" />
     </g>
+  );
+}
+
+const MOOD_EMOJI: Record<Mood, string | null> = { calm: null, happy: null, proud: "💪", party: "🎉" };
+
+/** Real profile photo when one is uploaded (exact likeness), otherwise the drawn character. */
+export default function Avatar(props: Props) {
+  const { who, mood = "happy", level = 1, size = 160, className = "", bob = true } = props;
+  const ctx = useContext(AppCtx);
+  const known = ctx?.s.avatars;
+  const ver = known ? known[who] : undefined;
+  const [failed, setFailed] = useState(false);
+  // inside the app we know whether a photo exists; on the profile picker we just try it
+  if (failed || (known && !ver)) return <MemojiAvatar {...props} />;
+  const ring = who === "tolga" ? "linear-gradient(135deg,#ffd166,#ff4d6d)" : "linear-gradient(135deg,#7be0d0,#3a86ff)";
+  const em = MOOD_EMOJI[mood];
+  return (
+    <span className={`relative inline-block shrink-0 ${bob ? "avatar-bob" : ""} ${className}`} style={{ width: size, height: size }}>
+      <span className="absolute inset-0 rounded-full" style={{ background: ring, padding: Math.max(3, size * 0.035) }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/avatar/${who}${ver ? `?v=${ver}` : ""}`}
+          alt={who === "tolga" ? "Tolga" : "Eylül"}
+          className="w-full h-full rounded-full object-cover bg-white"
+          onError={() => setFailed(true)}
+          draggable={false}
+        />
+      </span>
+      {level > 1 && (
+        <span
+          className="absolute grid place-items-center rounded-full font-extrabold text-white"
+          style={{ right: 0, bottom: 0, width: size * 0.3, height: size * 0.3, fontSize: size * 0.15, background: "#ff5d73", border: `${Math.max(2, size * 0.025)}px solid #fff` }}
+        >
+          {level}
+        </span>
+      )}
+      {em && size >= 56 && (
+        <span className="absolute" style={{ left: -size * 0.02, top: -size * 0.02, fontSize: size * 0.22 }} aria-hidden>
+          {em}
+        </span>
+      )}
+    </span>
   );
 }

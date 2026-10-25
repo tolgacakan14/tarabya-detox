@@ -1,7 +1,8 @@
 "use client";
 import QuickLog from "./QuickLog";
+import { usePhotoPicker } from "./PhotoAvatar";
+import { WeighIn, WeightCharts } from "./Weight";
 // Home: deliberately simple. Where am I (kg + progress bar), today's three rings, and the one next thing to do.
-import { useState } from "react";
 import { useApp, fmt, kg } from "./ui";
 import Avatar, { moodFor } from "./Avatar";
 import { Ring } from "./fx";
@@ -32,11 +33,13 @@ export default function Today() {
     <div className="grid grid-cols-1 gap-4 items-start">
       <div className="space-y-4">
         <ProgressHero />
+        <WeighIn />
         <QuickLog />
         <RingsCard />
       </div>
       <div className="space-y-4">
         <NextUp />
+        <WeightCharts compact />
         <CycleMini />
         <PartnerStrip />
         {s.engine.insights.filter((i) => i.tone === "warn").map((i, k) => (
@@ -65,12 +68,19 @@ function ProgressHero() {
   const gain = p.goal === "gain";
   const good = gain ? change >= 0 : change <= 0;
   const sign = change > 0 ? "+" : change < 0 ? "−" : "";
+  const photo = usePhotoPicker();
 
   return (
     <section className="panel !p-5 relative overflow-hidden">
+      {photo.el}
       <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full grad-me opacity-15" aria-hidden />
       <div className="flex items-center gap-4">
-        <Avatar who={s.user} mood={moodFor(s.todayScore.completion)} level={s.scores.me.level.index} size={104} />
+        <button className="relative shrink-0 press rounded-full" onClick={photo.open} aria-label="Profil fotoğrafını değiştir">
+          <Avatar who={s.user} mood={moodFor(s.todayScore.completion)} level={s.scores.me.level.index} size={104} />
+          <span className="absolute -left-1 bottom-0 grid place-items-center w-8 h-8 rounded-full bg-white shadow text-sm" aria-hidden>
+            📷
+          </span>
+        </button>
         <div>
           <p className="label">{gain ? "Aldığın kilo" : "Verdiğin kilo"}</p>
           <p className={`display font-bold leading-none num text-6xl ${good ? "text-grad" : ""}`}>
@@ -150,7 +160,6 @@ function NextUp() {
   const { s, act, go } = useApp();
   const { menu, prefs, eaten } = useMenu(s);
   const hour = new Date().getHours();
-  const [w, setW] = useState<number>(s.weighedToday ?? s.lastWeight ?? s.profile.startWeight);
   const asks = nextQuestions(prefs, 1);
 
   // which meal is next by clock, skipping eaten ones
@@ -163,24 +172,6 @@ function NextUp() {
 
   return (
     <>
-      {s.weighedToday === undefined && (
-        <section className="panel">
-          <p className="display text-xl font-bold">Günaydın tartısı ⚖️</p>
-          <div className="flex items-center gap-3 mt-3">
-            <button className="btn btn-ghost !w-12 !h-12 !p-0 text-2xl press" onClick={() => setW((x) => Math.round((x - 0.1) * 10) / 10)} aria-label="0,1 kg azalt">
-              −
-            </button>
-            <p className="display text-4xl font-bold num flex-1 text-center">{kg(w)}</p>
-            <button className="btn btn-ghost !w-12 !h-12 !p-0 text-2xl press" onClick={() => setW((x) => Math.round((x + 0.1) * 10) / 10)} aria-label="0,1 kg artır">
-              +
-            </button>
-          </div>
-          <button className="btn btn-me w-full mt-3 press" onClick={() => act({ action: "weight", kg: w }, { toast: "Tartı kaydedildi", points: 10 })}>
-            Kaydet
-          </button>
-        </section>
-      )}
-
       {next && (
         <section className="panel">
           <div className="flex items-baseline justify-between">

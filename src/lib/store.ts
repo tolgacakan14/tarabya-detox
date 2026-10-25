@@ -16,7 +16,8 @@ export type Kind =
   | "sleep"
   | "water"
   | "cycle"
-  | "flag";
+  | "flag"
+  | "avatar";
 
 export interface Rec<T = Record<string, unknown>> {
   id: string;

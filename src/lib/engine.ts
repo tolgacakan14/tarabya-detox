@@ -121,7 +121,9 @@ export function runEngine(
   }
 
   const B = bmr(p, currentWeight);
-  const priorTdee = B * p.activity;
+  const intense = p.intensity !== "standard";
+  // Tolga's metabolism runs hot: in intense mode start the gainer from a higher activity prior; data corrects it either way
+  const priorTdee = B * (intense && p.goal === "gain" ? Math.max(p.activity, 1.55) : p.activity);
 
   // Adaptive TDEE over the last 28 days ending yesterday
   const winEnd = addDays(today, -1);
@@ -161,12 +163,12 @@ export function runEngine(
   let kcal: number;
 
   if (p.goal === "gain") {
-    kcal = tdee + 350;
-    if (week >= 4 && weeklyRate !== null) {
-      if (weeklyRate < 0.1 && adaptiveWeight < 0.5) {
+    kcal = tdee + (intense ? 500 : 350);
+    if (week >= (intense ? 3 : 4) && weeklyRate !== null) {
+      if (weeklyRate < 0.1 && (intense || adaptiveWeight < 0.5)) {
         kcal += 150;
         insights.push({ tone: "warn", text: "Kilo trendin son 3 haftada neredeyse yatay. Hedefine 150 kcal ekledim. Genelde en kolayı: günde bir shake ya da bir avuç kuruyemiş daha." });
-      } else if (weeklyRate > 0.5) {
+      } else if (weeklyRate > (intense ? 0.6 : 0.5)) {
         kcal -= 100;
         insights.push({ tone: "info", text: "Haftada 0.5 kg'dan hızlı alıyorsun. Bu hızda fazlanın bir kısmı yağa gidiyor, hedefi 100 kcal azalttım." });
       } else if (weeklyRate >= 0.15) {
@@ -175,7 +177,7 @@ export function runEngine(
     }
     // tape-measure rule: waist growing faster than ~1 cm per kg gained → trim the surplus
     if (opts.waistTooFast) kcal -= 100;
-    kcal = Math.max(kcal, tdee + 150);
+    kcal = Math.max(kcal, tdee + (intense ? 250 : 150));
   } else {
     // Diet-break cycle: 8 weeks deficit, 2 weeks maintenance (MATADOR / ICECAP)
     const ds = p.deficitStart ?? p.startDate;
@@ -196,8 +198,10 @@ export function runEngine(
       phase = "maintenance";
       insights.push({ tone: "good", text: "Hedefine ulaştın! Şimdi bakım dönemi: kilonu korumaya odaklanıyoruz." });
     }
-    kcal = phase === "maintenance" ? tdee : tdee - 250;
-    if (phase === "deficit" && weeklyRate !== null && weeklyRate < -0.007 * currentWeight) {
+    // intense: ~22% deficit (300-500 kcal), still never below the floor applied later
+    const deficit = intense ? Math.min(500, Math.max(300, Math.round(tdee * 0.22))) : 250;
+    kcal = phase === "maintenance" ? tdee : tdee - deficit;
+    if (phase === "deficit" && weeklyRate !== null && weeklyRate < -(intense ? 0.009 : 0.007) * currentWeight) {
       kcal += 125;
       insights.push({ tone: "warn", text: "Son 3 haftada güvenli hızdan daha hızlı veriyorsun. Kas kaybetmemen için hedefini 125 kcal artırdım." });
     } else if (phase === "deficit" && weeklyRate !== null && weeklyRate <= -0.15) {
@@ -228,7 +232,7 @@ export function runEngine(
   if (p.goal === "gain") kcal = Math.max(kcal, Math.round(tdee));
   kcal = Math.round(kcal / 10) * 10;
 
-  const protein = Math.round((p.proteinPerKg * currentWeight) / 5) * 5;
+  const protein = Math.round(((intense ? Math.max(p.proteinPerKg, 2.0) : p.proteinPerKg) * currentWeight) / 5) * 5;
   const fat =
     p.goal === "gain"
       ? Math.round(1.0 * currentWeight)
@@ -242,13 +246,16 @@ export function runEngine(
       .filter(([d]) => d >= p.startDate && d < addDays(p.startDate, 7))
       .map(([, v]) => v);
     const base = firstWeek.length >= 3 ? firstWeek.reduce((a, b) => a + b, 0) / firstWeek.length : p.stepBaseline;
-    steps = Math.min(9000, Math.round((base + 500 * (week - 1)) / 500) * 500);
+    // intense: walking is Eylül's biggest lever (NEAT), ramp faster to 10k
+    steps = intense
+      ? Math.min(10000, Math.round((Math.max(base, 5000) + 1000 * (week - 1)) / 500) * 500)
+      : Math.min(9000, Math.round((base + 500 * (week - 1)) / 500) * 500);
     steps = Math.max(steps, 3000);
   } else {
     steps = 7000;
   }
 
-  const sessionsPerWeek = p.goal === "gain" ? 3 : week <= 4 ? 2 : 3;
+  const sessionsPerWeek = p.goal === "gain" || intense ? 3 : week <= 4 ? 2 : 3;
 
   // Milestones
   const milestones =

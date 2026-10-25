@@ -1,5 +1,26 @@
 "use client";
 import CycleCard from "./Cycle";
+import { WeightCharts, WeightHistory } from "./Weight";
+import { usePhotoPicker } from "./PhotoAvatar";
+import Avatar from "./Avatar";
+
+function PhotoCard() {
+  const { s } = useApp();
+  const photo = usePhotoPicker();
+  return (
+    <section className="panel flex items-center gap-4">
+      {photo.el}
+      <Avatar who={s.user} size={64} bob={false} />
+      <div className="flex-1 min-w-0">
+        <p className="font-bold">Profil fotoğrafı</p>
+        <p className="label">{s.avatars[s.user] ? "Kendi fotoğrafın kullanılıyor." : "Gerçek fotoğrafını koy, ikiniz de birbirinizi görün."}</p>
+      </div>
+      <button className="btn btn-me press !px-4" onClick={photo.open}>
+        📸 {s.avatars[s.user] ? "Değiştir" : "Yükle"}
+      </button>
+    </section>
+  );
+}
 import { MEASURE_FIELDS } from "@/lib/body";
 import { useState } from "react";
 import { useApp, Section, Stat, fmt } from "./ui";
@@ -19,14 +40,9 @@ export default function Progress() {
   return (
     <div className="grid grid-cols-1 gap-4">
       <div className="space-y-4">
-        <Section title="Kilo trendi">
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <Stat value={e.currentWeight.toLocaleString("tr-TR")} unit="kg" label="Trend kilo" />
-            <Stat value={e.weeklyRate === null ? "—" : `${e.weeklyRate > 0 ? "+" : ""}${e.weeklyRate.toLocaleString("tr-TR")}`} unit="kg/hf" label="Haftalık hız" />
-            <Stat value={s.profile.targetWeight.toLocaleString("tr-TR")} unit="kg" label="Hedef" />
-          </div>
-          <TrendChart />
-          <ul className="mt-4 flex flex-wrap gap-2">
+        <WeightCharts />
+        <Section title="Hedef yolculuğu">
+          <ul className="flex flex-wrap gap-2">
             {e.milestones.map((ms) => (
               <li key={ms.label} className="chip" style={ms.reached ? { background: "var(--me)", color: "#fff", borderColor: "var(--me)" } : undefined}>
                 {ms.label}: {ms.weight.toLocaleString("tr-TR")} kg {ms.reached ? "✓" : ""}
@@ -35,6 +51,7 @@ export default function Progress() {
           </ul>
         </Section>
 
+        <WeightHistory />
         <CycleCard />
         <BodyCard />
       </div>
@@ -59,11 +76,29 @@ export default function Progress() {
               </>
             )}
           </dl>
+          <div className="mt-4 rounded-2xl p-3" style={{ background: "var(--me-soft)" }}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-bold">🔥 Yoğun mod</p>
+              <button
+                className="chip press"
+                aria-pressed={s.profile.intensity !== "standard"}
+                onClick={() => act({ action: "profile", patch: { intensity: s.profile.intensity === "standard" ? "intense" : "standard" } }, { toast: "Plan güncellendi" })}
+              >
+                {s.profile.intensity === "standard" ? "Kapalı" : "Açık"}
+              </button>
+            </div>
+            <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>
+              {gain
+                ? "Günde ~500 kcal fazla, daha yüksek başlangıç harcaması ve 2 g/kg protein. Tartı yatay giderse 3. haftadan itibaren kendiliğinden artırır."
+                : "Daha büyük açık (~%22), haftalık +1000 adım ile 10 bine çıkış, haftada 3 kuvvet antrenmanı ve 2 g/kg protein. Kalori yine güvenlik tabanının altına inmez; çok hızlı gidersen kas kaybetmemen için frene basar."}
+            </p>
+          </div>
           <p className="text-sm mt-3" style={{ color: "var(--ink-2)" }}>
             İlk haftalarda formülle başlıyoruz. Tartı ve yemek kayıtların biriktikçe sistem senin gerçek harcamanı öğreniyor ve hedefi kendisi düzeltiyor.
           </p>
         </Section>
 
+        <PhotoCard />
         <details className="panel"><summary className="display text-xl font-semibold cursor-pointer">⚙️ Bilgilerimi düzenle</summary><div className="mt-3">
           <form
             className="space-y-2"
@@ -119,41 +154,6 @@ export default function Progress() {
         )}
       </div>
     </div>
-  );
-}
-
-function TrendChart() {
-  const { s } = useApp();
-  const data = s.engine.trend;
-  if (data.length < 2) {
-    return <p style={{ color: "var(--ink-2)" }}>Birkaç gün sabah tartıl, trend çizgin burada belirecek.</p>;
-  }
-  const W = 600,
-    H = 200,
-    P = 28;
-  const ys = data.flatMap((d) => [d.weight, d.trend]).concat([s.profile.targetWeight]);
-  const min = Math.min(...ys) - 0.5,
-    max = Math.max(...ys) + 0.5;
-  const x = (i: number) => P + (i / (data.length - 1)) * (W - P * 2);
-  const y = (v: number) => H - P - ((v - min) / (max - min)) * (H - P * 2);
-  const line = data.map((d, i) => `${i ? "L" : "M"}${x(i)} ${y(d.trend)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Kilo trendi grafiği">
-      <line x1={P} x2={W - P} y1={y(s.profile.targetWeight)} y2={y(s.profile.targetWeight)} stroke="var(--ink-3)" strokeDasharray="4 4" />
-      <text x={W - P} y={y(s.profile.targetWeight) - 6} textAnchor="end" fontSize="12" fill="var(--ink-2)">
-        hedef {s.profile.targetWeight}
-      </text>
-      {data.map((d, i) => (
-        <circle key={i} cx={x(i)} cy={y(d.weight)} r="3" fill="var(--ink-3)" opacity="0.5" />
-      ))}
-      <path d={line} fill="none" stroke="var(--me)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-      <text x={P} y={H - 6} fontSize="12" fill="var(--ink-2)">
-        {data[0].date.slice(5)}
-      </text>
-      <text x={W - P} y={H - 6} fontSize="12" fill="var(--ink-2)" textAnchor="end">
-        {data[data.length - 1].date.slice(5)}
-      </text>
-    </svg>
   );
 }
 

@@ -121,9 +121,10 @@ function engineFor(raw: Raw, date: string) {
   return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags, {
     waistTooFast,
     cycleStop: cycleStop > 0,
-    cycleKcalBonus: raw.profile.goal === "lose" ? cyc.kcalBonus : 0,
+    // intense (hard diet we both asked for): smaller premenstrual allowance, no exercise eat-back for the loser
+    cycleKcalBonus: raw.profile.goal === "lose" ? (raw.profile.intensity !== "standard" ? Math.min(100, cyc.kcalBonus) : cyc.kcalBonus) : 0,
     cycleWaterWeight: cyc.waterWeightLikely,
-    exerciseKcal: eatBack(raw.profile.goal, extra.kcal),
+    exerciseKcal: raw.profile.goal === "lose" && raw.profile.intensity !== "standard" ? 0 : eatBack(raw.profile.goal, extra.kcal),
     exerciseBurn: extra.kcal,
   });
 }
@@ -214,8 +215,9 @@ function scoreDay(raw: Raw, eng: EngineResult, date: string, partnerWalks: Set<s
     add("kcal", `En az ${Math.round(t.kcal * 0.95)} kcal`, kcal >= t.kcal * 0.95, 20, Math.round(Math.min(1, kcal / t.kcal) * 20));
   } else {
     const lo = Math.max(eng.floor, Math.round(t.kcal * 0.85)); // never reward eating under the safety floor
-    const inBand = kcal >= lo && kcal <= t.kcal * 1.1;
-    add("kcal", `Kalori ${lo}-${Math.round(t.kcal * 1.1)} arası`, inBand, 20);
+    const hiK = Math.round(t.kcal * (p.intensity !== "standard" ? 1.05 : 1.1));
+    const inBand = kcal >= lo && kcal <= hiK;
+    add("kcal", `Kalori ${lo}-${hiK} arası`, inBand, 20);
   }
   add("water", `${WATER_TARGET} bardak su`, water >= WATER_TARGET, 40, Math.min(WATER_TARGET, water) * 5);
   add("steps", `${t.steps.toLocaleString("tr-TR")} adım`, steps >= t.steps, 20, Math.round(Math.min(1, steps / t.steps) * 20));
@@ -464,7 +466,15 @@ export async function buildState(user: UserId) {
       target: praw.profile.targetWeight,
       weeklyRate: pEng.weeklyRate,
       weighIns: pEng.trend.length,
+      // both of us asked to see each other's curve; raw weights stay with the owner, the partner sees the smoothed trend
+      trend: pEng.trend.map((t) => ({ date: t.date, trend: t.trend })),
     },
+    weightLog: raw.weights.slice(-60).map((w) => ({ id: w.id, date: w.date, kg: w.data.kg })),
+    avatars: Object.fromEntries(
+      await Promise.all(
+        (["tolga", "eylul"] as const).map(async (u) => [u, (await list<{ v: number }>(u, "avatar", "0000-00-00", "0000-00-00"))[0]?.data.v] as const)
+      )
+    ) as Record<"tolga" | "eylul", number | undefined>,
   };
 }
 

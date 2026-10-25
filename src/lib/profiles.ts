@@ -14,6 +14,7 @@ export interface Profile {
   startDate: string; // program week 1 starts here
   activity: number; // starting activity multiplier
   proteinPerKg: number;
+  intensity?: "standard" | "intense"; // undefined = intense (we both asked for the faster plan)
   kcalAdjust: number; // manual adjustment from coach, bounded by guardrails
   stepBaseline: number;
   equipment: string;

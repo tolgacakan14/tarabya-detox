@@ -17,7 +17,7 @@ const num = boundedNumber;
 
 export async function POST(req: Request) {
   try {
-    if (Number(req.headers.get("content-length") ?? 0) > 64_000) throw new Error("İstek çok büyük");
+    if (Number(req.headers.get("content-length") ?? 0) > 450_000) throw new Error("İstek çok büyük");
     const body = (await req.json().catch(() => null)) as Body | null;
     if (!body || typeof body !== "object" || typeof body.action !== "string") throw new Error("Geçersiz istek");
     if (body.action === "login") {
@@ -75,14 +75,29 @@ async function act(user: UserId, d: string, b: Body) {
     case "delete": {
       const id = String(b.id);
       // only things the UI lets you delete (never profile or cycle history by accident)
-      const own = await Promise.all((["food", "water", "workout", "todo"] as const).map((k) => list(user, k, addDays(d, -400), d)));
+      const own = await Promise.all((["food", "water", "workout", "todo", "weight"] as const).map((k) => list(user, k, addDays(d, -400), d)));
       if (!own.flat().some((r) => r.id === id)) throw new Error("Silinecek kayıt bulunamadı");
       await remove(user, id);
       return;
     }
-    case "weight":
-      await setDaily(user, "weight", d, { kg: num(b.kg, 30, 200) });
+    case "avatar": {
+      // a small square JPEG cropped on the phone; served from /api/avatar/[user]
+      const img = typeof b.image === "string" ? b.image : "";
+      if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 400_000) throw new Error("Fotoğraf okunamadı");
+      await setDaily(user, "avatar", "0000-00-00", { img, v: Date.now() });
       return;
+    }
+    case "avatarRemove": {
+      const recs = await list(user, "avatar", "0000-00-00", "0000-00-00");
+      for (const r of recs) await remove(user, r.id);
+      return;
+    }
+    case "weight": {
+      // a past morning can be filled in or corrected (last 30 days)
+      const date = b.date === undefined ? d : validDate(b.date, addDays(d, -30), d);
+      await setDaily(user, "weight", date, { kg: Math.round(num(b.kg, 30, 200) * 10) / 10 });
+      return;
+    }
     case "steps":
       await setDaily(user, "steps", d, { steps: Math.round(num(b.steps, 0, 80000)) });
       return;
@@ -221,6 +236,7 @@ async function act(user: UserId, d: string, b: Body) {
       for (const k of ["likes", "dislikes", "why", "equipment"] as const) if (typeof patch[k] === "string") next[k] = String(patch[k]).slice(0, 300);
       if (Array.isArray(patch.ifThen)) next.ifThen = patch.ifThen.map((x) => String(x).slice(0, 120)).filter(Boolean).slice(0, 6);
       if (typeof patch.cycleTracking === "boolean") next.cycleTracking = patch.cycleTracking;
+      if (patch.intensity === "standard" || patch.intensity === "intense") next.intensity = patch.intensity;
       if (typeof patch.onboarded === "boolean") next.onboarded = patch.onboarded;
       await saveProfile(user, next);
       if (patch.startWeight !== undefined && !(await list(user, "weight", d, d)).length) {
