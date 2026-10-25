@@ -5,12 +5,14 @@ export const metadata: Metadata = {
   title: "İkimiz",
   description: "Tolga ve Eylül'ün beslenme, antrenman ve motivasyon planı",
   robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: "İkimiz", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#eef2f0",
+  themeColor: "#f4f1ff",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
