@@ -17,6 +17,7 @@ const num = boundedNumber;
 
 export async function POST(req: Request) {
   try {
+    if (Number(req.headers.get("content-length") ?? 0) > 64_000) throw new Error("İstek çok büyük");
     const body = (await req.json().catch(() => null)) as Body | null;
     if (!body || typeof body !== "object" || typeof body.action !== "string") throw new Error("Geçersiz istek");
     if (body.action === "login") {
@@ -37,7 +38,9 @@ export async function POST(req: Request) {
     await act(user, d, body);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    const msg = (e as Error).message;
+    // don't leak JS internals ("Cannot read properties of undefined…")
+    return NextResponse.json({ error: e instanceof TypeError ? "Geçersiz istek" : msg }, { status: 400 });
   }
 }
 
@@ -63,14 +66,18 @@ async function act(user: UserId, d: string, b: Body) {
         const v = validFood(e);
         entry = { name: v.name, amount: v.amount, kcal: Math.round(v.kcal), protein: v.protein, carbs: v.carbs, fat: v.fat, source: (v.source as FoodEntry["source"]) ?? "quick" };
       }
-      entry.meal = b.meal ? String(b.meal) : undefined;
+      entry.meal = b.meal ? String(b.meal).slice(0, 40) : undefined;
       entry.planned = b.planned === true;
       entry.time = nowTime();
       await add(user, "food", d, entry);
       return;
     }
     case "delete": {
-      await remove(user, String(b.id));
+      const id = String(b.id);
+      // only things the UI lets you delete (never profile or cycle history by accident)
+      const own = await Promise.all((["food", "water", "workout", "todo"] as const).map((k) => list(user, k, addDays(d, -400), d)));
+      if (!own.flat().some((r) => r.id === id)) throw new Error("Silinecek kayıt bulunamadı");
+      await remove(user, id);
       return;
     }
     case "weight":
@@ -83,7 +90,8 @@ async function act(user: UserId, d: string, b: Body) {
       await setDaily(user, "sleep", d, { hours: num(b.hours, 0, 16) });
       return;
     case "water": {
-      const delta = Math.round(num(b.delta, -1, 4));
+      const delta = num(b.delta, -1, 4);
+      if (!Number.isInteger(delta) || delta === 0) throw new Error("Geçersiz değer");
       if (delta > 0) await add(user, "water", d, { glasses: delta });
       else {
         const recs = await list<{ glasses: number }>(user, "water", d, d);
@@ -98,23 +106,29 @@ async function act(user: UserId, d: string, b: Body) {
     }
     case "workout": {
       const w = b.log as WorkoutLog;
-      if (!["strength", "mini", "walk", "run"].includes(w.type)) throw new Error("Geçersiz antrenman");
+      if (!w || typeof w !== "object" || !["strength", "mini", "walk", "run"].includes(w.type)) throw new Error("Geçersiz antrenman");
+      const minsToday = (await list<WorkoutLog>(user, "workout", d, d)).reduce((t, r) => t + (r.data.minutes ?? 0), 0);
+      if (w.minutes && minsToday + Number(w.minutes) > 360) throw new Error("Bugün için çok fazla dakika, bir yazım hatası olabilir mi?");
       await add<WorkoutLog>(user, "workout", d, {
         type: w.type,
-        session: w.session,
+        session: w.session ? String(w.session).slice(0, 4) : undefined,
         minutes: w.minutes ? num(w.minutes, 1, 300) : undefined,
         withPartner: !!w.withPartner,
         exercises: (w.exercises ?? []).slice(0, 12).map((e) => ({
           id: String(e.id),
           level: Math.round(num(e.level, 0, 10)),
-          sets: e.sets.slice(0, 6).map((s) => Math.round(num(s || 0, 0, 200))),
+          sets: (Array.isArray(e.sets) ? e.sets : []).slice(0, 6).map((s) => Math.round(num(s || 0, 0, 200))),
         })),
       });
       return;
     }
-    case "addTodo":
-      await add<Todo>(user, "todo", d, { text: String(b.text).slice(0, 120), done: false, from: "me" });
+    case "addTodo": {
+      const text = typeof b.text === "string" ? b.text.trim().slice(0, 120) : "";
+      if (!text) throw new Error("Bir şey yaz");
+      if ((await list(user, "todo", d, d)).length >= 10) throw new Error("Bugün için 10 görev yeter");
+      await add<Todo>(user, "todo", d, { text, done: false, from: "me" });
       return;
+    }
     case "toggleTodo": {
       const recs = await list<Todo>(user, "todo", String(b.date ?? d), String(b.date ?? d));
       const r = recs.find((x) => x.id === b.id);
@@ -192,17 +206,20 @@ async function act(user: UserId, d: string, b: Body) {
     case "profile": {
       const { profile } = await getProfile(user);
       const patch = b.patch as Partial<Profile>;
+      if (!patch || typeof patch !== "object") throw new Error("Geçersiz istek");
       const next: Profile = { ...profile };
       if (patch.age !== undefined) next.age = num(patch.age, 14, 80);
       if (patch.heightCm !== undefined) next.heightCm = num(patch.heightCm, 120, 220);
       if (patch.startWeight !== undefined) next.startWeight = num(patch.startWeight, 30, 200);
-      if (patch.targetWeight !== undefined) {
-        const r = clampTargetWeight(next, num(patch.targetWeight, 30, 200));
-        next.targetWeight = r.value;
-      }
+      // always re-clamp: a height/age change can push an old target under BMI 18.5
+      let tw = patch.targetWeight !== undefined ? num(patch.targetWeight, 30, 200) : next.targetWeight;
+      if (next.goal === "gain" && tw <= next.startWeight) throw new Error("Kilo alma hedefi şu anki kilondan yüksek olmalı");
+      if (next.goal === "lose" && tw >= next.startWeight + 0.1 && patch.targetWeight !== undefined) throw new Error("Kilo verme hedefi şu anki kilondan düşük olmalı");
+      tw = clampTargetWeight(next, tw).value;
+      next.targetWeight = tw;
       if (patch.stepBaseline !== undefined) next.stepBaseline = num(patch.stepBaseline, 500, 30000);
       for (const k of ["likes", "dislikes", "why", "equipment"] as const) if (typeof patch[k] === "string") next[k] = String(patch[k]).slice(0, 300);
-      if (Array.isArray(patch.ifThen)) next.ifThen = patch.ifThen.map(String).filter(Boolean).slice(0, 6);
+      if (Array.isArray(patch.ifThen)) next.ifThen = patch.ifThen.map((x) => String(x).slice(0, 120)).filter(Boolean).slice(0, 6);
       if (typeof patch.cycleTracking === "boolean") next.cycleTracking = patch.cycleTracking;
       if (typeof patch.onboarded === "boolean") next.onboarded = patch.onboarded;
       await saveProfile(user, next);

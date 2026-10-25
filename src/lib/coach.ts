@@ -7,6 +7,7 @@ import { clampKcalAdjust, clampTargetWeight, type FoodEntry } from "./engine";
 import { addDays, nowTime, today as todayFn, trDay } from "./dates";
 import { PARTNER } from "./profiles";
 import { FOODS } from "./foods";
+import { boundedNumber, validDate, validFood } from "./validate";
 import { PHASES, type PhaseKey } from "./cycle";
 import { LOG_CUSTOM_TOOL, logCustomWorkout, sanitizeActivities } from "./workouts-server";
 
@@ -248,16 +249,25 @@ async function runTool(user: UserId, name: string, input: Record<string, unknown
   const { profile } = await getProfile(user);
   switch (name) {
     case "log_food": {
-      const items = (input.items as FoodEntry[]) ?? [];
+      const raw = Array.isArray(input.items) ? (input.items as unknown[]).slice(0, 12) : [];
+      const items = raw.flatMap((x) => {
+        const it = x as Record<string, unknown>;
+        try {
+          return [validFood({ name: String(it.name ?? ""), amount: it.amount ? String(it.amount).slice(0, 60) : undefined, kcal: Number(it.kcal), protein: Number(it.protein) || 0, carbs: Number(it.carbs) || 0, fat: Number(it.fat) || 0 })];
+        } catch {
+          return [];
+        }
+      });
+      if (!items.length) return "Kaydedilecek geçerli bir yemek yok; kalori değerlerini kontrol et.";
       for (const it of items) {
         await add<FoodEntry>(user, "food", date, {
-          name: String(it.name),
-          amount: String(it.amount ?? ""),
-          kcal: Math.round(Number(it.kcal) || 0),
-          protein: Math.round((Number(it.protein) || 0) * 10) / 10,
-          carbs: Math.round((Number(it.carbs) || 0) * 10) / 10,
-          fat: Math.round((Number(it.fat) || 0) * 10) / 10,
-          meal: input.meal as string | undefined,
+          name: it.name,
+          amount: it.amount ?? "",
+          kcal: Math.round(it.kcal),
+          protein: Math.round(it.protein * 10) / 10,
+          carbs: Math.round(it.carbs * 10) / 10,
+          fat: Math.round(it.fat * 10) / 10,
+          meal: input.meal ? String(input.meal).slice(0, 40) : undefined,
           planned: input.planned === true,
           time: nowTime(),
           source: "coach",
@@ -277,35 +287,60 @@ async function runTool(user: UserId, name: string, input: Record<string, unknown
         : `Sınır nedeniyle sadece ${applied} kcal uygulanabildi (toplam ayar ${next}).`;
     }
     case "add_todo": {
-      const d = (input.date as string) || date;
-      await add(user, "todo", d, { text: String(input.text), done: false, from: "coach" });
+      let d = date;
+      try {
+        if (input.date) d = validDate(input.date, date, addDays(date, 14));
+      } catch {
+        /* keep today */
+      }
+      const text = String(input.text ?? "").trim().slice(0, 120);
+      if (!text) return "Görev metni boş.";
+      await add(user, "todo", d, { text, done: false, from: "coach" });
       return "Görev eklendi.";
     }
     case "log_measurement": {
       const out: string[] = [];
-      if (input.weight_kg) {
-        await setDaily(user, "weight", date, { kg: Number(input.weight_kg) });
+      const bad: string[] = [];
+      const ok = (v: unknown, lo: number, hi: number, label: string) => {
+        if (v === undefined || v === null || v === "" || v === 0) return undefined;
+        try {
+          return boundedNumber(v, lo, hi);
+        } catch {
+          bad.push(label);
+          return undefined;
+        }
+      };
+      const kg = ok(input.weight_kg, 30, 200, "kilo");
+      if (kg !== undefined) {
+        await setDaily(user, "weight", date, { kg });
         out.push("kilo");
       }
-      if (input.steps) {
-        await setDaily(user, "steps", date, { steps: Math.round(Number(input.steps)) });
+      const steps = ok(input.steps, 0, 80000, "adım");
+      if (steps !== undefined) {
+        await setDaily(user, "steps", date, { steps: Math.round(steps) });
         out.push("adım");
       }
-      if (input.sleep_hours) {
-        await setDaily(user, "sleep", date, { hours: Number(input.sleep_hours) });
+      const sleep = ok(input.sleep_hours, 0, 16, "uyku");
+      if (sleep !== undefined) {
+        await setDaily(user, "sleep", date, { hours: sleep });
         out.push("uyku");
       }
-      if (input.water_glasses) {
-        await add(user, "water", date, { glasses: Math.round(Number(input.water_glasses)) });
+      const water = ok(input.water_glasses, 1, 4, "su");
+      if (water !== undefined) {
+        await add(user, "water", date, { glasses: Math.round(water) });
         out.push("su");
       }
       const m: Record<string, number> = {};
-      for (const k of ["waist_cm", "arm_cm", "chest_cm", "thigh_cm", "hip_cm", "underbust_cm"]) if (input[k]) m[k.replace("_cm", "")] = Number(input[k]);
+      for (const k of ["waist_cm", "arm_cm", "chest_cm", "thigh_cm", "hip_cm", "underbust_cm"]) {
+        const v = ok(input[k], 15, 200, k);
+        if (v !== undefined) m[k.replace("_cm", "")] = v;
+      }
       if (Object.keys(m).length) {
         const prev = (await list<Record<string, number>>(user, "measure", date, date))[0]?.data ?? {};
         await setDaily(user, "measure", date, { ...prev, ...m });
         out.push("ölçüler");
       }
+      if (bad.length) out.push(`(geçersiz olduğu için atlandı: ${bad.join(", ")})`);
       return out.length ? `Kaydedildi: ${out.join(", ")}.` : "Kaydedilecek değer yoktu.";
     }
     case "log_workout": {

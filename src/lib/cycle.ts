@@ -155,7 +155,7 @@ export function analyzeCycle(days: CycleDay[], today: string): CycleInfo {
   if (info.lateDays > 0) info.phase = "premenstrual";
 
   // phase-aware adjustments
-  if (info.phase === "premenstrual") info.kcalBonus = 150;
+  if (info.phase === "premenstrual" && info.day <= 45) info.kcalBonus = 150;
   info.waterWeightLikely = info.phase === "premenstrual" || (info.phase === "menstrual" && info.day <= 3);
 
   // safety & regularity (FIGO normal: 24–38 days, variation ≤ 7–9 days, bleeding ≤ 8 days)

@@ -161,8 +161,10 @@ export function buildMenu(opts: {
     return Math.max(0.2, s);
   };
 
-  const pick = (r: () => number, cands: Food[], used: Set<string>) => {
-    const list = cands.filter((f) => !used.has(f.id));
+  const pick = (r: () => number, cands: Food[], used: Set<string>, local?: Set<string>) => {
+    let list = cands.filter((f) => !used.has(f.id));
+    // snacks and drinks may repeat across the day (a second ayran is fine), just not within one meal
+    if (!list.length && local) list = cands.filter((f) => !local.has(f.id) && ["snack", "drink"].includes(META[f.id].role));
     if (!list.length) return null;
     const total = list.reduce((a, f) => a + score(f), 0);
     let x = r() * total;
@@ -190,8 +192,9 @@ export function buildMenu(opts: {
 
     if (slot === "ara öğün") {
       const snacks = goal === "gain" ? byRole("snack", "drink", "protein") : byRole("protein", "snack", "drink");
-      add(pick(r, snacks, used));
-      if (budget > 300) add(pick(r, byRole("snack", "drink"), used));
+      const local = () => new Set(chosen.map((c) => c.id));
+      add(pick(r, snacks, used, local()));
+      if (budget > 300) add(pick(r, byRole("snack", "drink"), used, local()));
     } else if (slot === "kahvaltı") {
       add(pick(r, byRole("protein", "dish"), used));
       if (chosen[0] && META[chosen[0].id].role !== "dish") add(pick(r, byRole("carb"), used));
@@ -209,7 +212,7 @@ export function buildMenu(opts: {
     const items = chosen.map((f) => ({ f, qty: 1 }));
     const total = () => items.reduce((a, i) => a + i.f.kcal * i.qty, 0);
     const scalable = items.filter((i) => ["protein", "carb", "dish", "snack", "drink"].includes(META[i.f.id].role));
-    for (let guard = 0; guard < 8 && scalable.length; guard++) {
+    for (let guard = 0; guard < 16 && scalable.length; guard++) {
       const t = total();
       if (t < budget * 0.88) {
         const target = scalable.reduce((best, i) => (i.qty < best.qty ? i : best), scalable[0]);
@@ -266,11 +269,40 @@ export function buildMenu(opts: {
     }
   }
 
+  // whole-day calibration: after the protein top-up, nudge portions until the day is within ±10%
+  const recalc = (m: MenuMeal) => {
+    m.kcal = m.items.reduce((a, x) => a + x.kcal, 0);
+    m.protein = m.items.reduce((a, x) => a + x.protein, 0);
+  };
+  const all = () => meals.flatMap((m) => m.items.map((i) => ({ m, i, f: FOODS.find((x) => x.id === i.foodId)! })));
+  const scalableRole = (id: string) => ["protein", "carb", "dish", "snack", "drink"].includes(META[id]?.role);
+  for (let guard = 0; guard < 24; guard++) {
+    const day = meals.reduce((a, m) => a + m.kcal, 0);
+    const its = all().filter((x) => scalableRole(x.i.foodId));
+    if (!its.length) break;
+    let t;
+    if (day < opts.kcal * 0.92) {
+      // grow the most energy-dense item that still has room (fewest steps to the target)
+      t = its.filter((x) => x.i.qty < 3).sort((a, b) => b.f.kcal - a.f.kcal)[0];
+      if (!t) break;
+      t.i.qty += 0.5;
+    } else if (day > opts.kcal * 1.08) {
+      // shrink, but keep protein foods where they are
+      t = its.filter((x) => x.i.qty > 0.5 && META[x.i.foodId].role !== "protein").sort((a, b) => b.i.kcal - a.i.kcal)[0] ?? its.filter((x) => x.i.qty > 0.5).sort((a, b) => b.i.kcal - a.i.kcal)[0];
+      if (!t) break;
+      t.i.qty -= 0.5;
+    } else break;
+    t.i.kcal = Math.round(t.f.kcal * t.i.qty);
+    t.i.protein = Math.round(t.f.protein * t.i.qty);
+    recalc(t.m);
+  }
+  proteinNow = meals.reduce((a, m) => a + m.protein, 0);
+
   const kcal = meals.reduce((a, m) => a + m.kcal, 0);
   const protein = proteinNow;
   let note: string | undefined;
   if (known < 12) note = "Henüz neleri sevdiğini tam bilmiyorum. Menüdeki yeni yiyecekleri işaretledikçe sadece sevdiklerinden menü kuracağım.";
-  else if (protein < opts.protein * 0.8) note = "Sevdiğin yiyeceklerle protein hedefi zor tutuyor. Yumurta, yoğurt, tavuk ya da ton balığından birini sevdiklerine eklersen menü çok daha iyi olur.";
+  else if (protein < opts.protein * 0.9) note = "Sevdiğin yiyeceklerle protein hedefi zor tutuyor. Yumurta, yoğurt, tavuk ya da ton balığından birini sevdiklerine eklersen menü çok daha iyi olur.";
   return { meals, kcal, protein, knownFoods: known, note };
 }
 

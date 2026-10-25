@@ -235,6 +235,7 @@ body {
   border: 1.5px solid var(--line);
 }
 .chip {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -270,8 +271,10 @@ body {
 }
 
 .tick {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
+  /* 44px touch area without a bigger visual */
+  box-shadow: 0 0 0 7px transparent;
   border-radius: 999px;
   border: 2px solid var(--line);
   display: grid;
@@ -404,4 +407,12 @@ body {
     opacity: 1;
     transform: translateY(-3px);
   }
+}
+
+/* disabled primary: readable grey instead of white-on-pale-orange */
+.btn-me:disabled {
+  opacity: 1;
+  background: var(--line);
+  color: var(--ink-2);
+  box-shadow: none;
 }

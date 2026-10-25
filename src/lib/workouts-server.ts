@@ -13,10 +13,12 @@ export function sanitizeActivities(input: unknown): Activity[] {
     const x = Number(v);
     return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : undefined;
   };
+  let budget = 240; // total minutes per logged session
   return arr.slice(0, 10).flatMap((raw) => {
     const a = raw as Record<string, unknown>;
-    const minutes = n(a.minutes, 1, 300);
+    const minutes = Math.min(budget, n(a.minutes, 1, 300) ?? 0);
     if (!minutes) return [];
+    budget -= minutes;
     return [
       {
         name: String(a.name ?? "Antrenman").slice(0, 60),
@@ -25,7 +27,8 @@ export function sanitizeActivities(input: unknown): Activity[] {
         minutes: Math.round(minutes),
         intensity: (["light", "moderate", "vigorous"].includes(String(a.intensity)) ? a.intensity : "moderate") as Activity["intensity"],
         sets: a.sets ? Math.round(n(a.sets, 1, 60) ?? 0) || undefined : undefined,
-        distanceKm: a.distanceKm ? n(a.distanceKm, 0.1, 100) : undefined,
+        // cap speed at 25 km/h so "100 km in 10 min" can't inflate the burn
+        distanceKm: a.distanceKm ? Math.min(n(a.distanceKm, 0.1, 100) ?? 0, (minutes / 60) * 25) : undefined,
         muscles: Array.isArray(a.muscles) ? (a.muscles as string[]).filter((m) => MUSCLES.includes(m)).slice(0, 7) as Activity["muscles"] : undefined,
       },
     ];

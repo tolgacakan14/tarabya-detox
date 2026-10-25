@@ -102,7 +102,7 @@ export function runEngine(
   intakeByDate: Record<string, number>,
   stepsByDate: Record<string, number>,
   redFlagsRecent: number,
-  opts: { waistTooFast?: boolean; cycleKcalBonus?: number; cycleWaterWeight?: boolean; exerciseKcal?: number; exerciseBurn?: number } = {}
+  opts: { waistTooFast?: boolean; cycleStop?: boolean; cycleKcalBonus?: number; cycleWaterWeight?: boolean; exerciseKcal?: number; exerciseBurn?: number } = {}
 ): EngineResult {
   const dayIndex = Math.max(0, daysBetween(p.startDate, today));
   const week = Math.floor(dayIndex / 7) + 1;
@@ -183,7 +183,10 @@ export function runEngine(
     const plannedBreak = wInCycle >= 8;
     const manualBreak = p.maintenanceUntil && p.maintenanceUntil >= today;
     const reachedGoal = currentWeight <= p.targetWeight;
-    if (redFlagsRecent > 0) {
+    if (opts.cycleStop) {
+      phase = "maintenance";
+      insights.push({ tone: "warn", text: "Adetin 45 günden uzun süredir gelmedi. Açığı durdurdum, bakım kalorisindesin. Bir kadın doğum uzmanına görünmeni öneririm." });
+    } else if (redFlagsRecent > 0) {
       phase = "maintenance";
       insights.push({ tone: "warn", text: "Son iki haftada bir uyarı işareti kaydettin. Açığı durdurdum, şu an bakım kalorisindesin. Devam ederse bir doktor ya da diyetisyenle konuşmanı istiyorum." });
     } else if (manualBreak || plannedBreak) {
@@ -202,7 +205,7 @@ export function runEngine(
     }
   }
 
-  if (opts.cycleKcalBonus) {
+  if (opts.cycleKcalBonus && !opts.cycleStop) {
     kcal += opts.cycleKcalBonus;
     insights.push({ tone: "info", text: `Adet öncesi dönemdesin: iştah ve metabolizma biraz artıyor, hedefine +${opts.cycleKcalBonus} kcal döngü payı ekledim.` });
   }

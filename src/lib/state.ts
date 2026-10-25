@@ -115,11 +115,12 @@ function engineFor(raw: Raw, date: string) {
   const redFlags = raw.flags.filter((f) => f.date > addDays(date, -14) && f.date <= date).length;
   const body = bodyFor(raw, date);
   const waistTooFast = raw.profile.goal === "gain" && body.waistPerKg !== undefined && body.waistPerKg > 1;
-  const cyc = cycleFor(raw, date);
+  const cyc = raw.profile.cycleTracking === false ? analyzeCycle([], date) : cycleFor(raw, date);
   const extra = extraBurn(raw, date);
   const cycleStop = cyc.hasData && (cyc.day ?? 0) > 45 ? 1 : 0; // missed period while dieting → pause the deficit
-  return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags + cycleStop, {
+  return runEngine(raw.profile, date, weights, intakeByDate, stepsByDate, redFlags, {
     waistTooFast,
+    cycleStop: cycleStop > 0,
     cycleKcalBonus: raw.profile.goal === "lose" ? cyc.kcalBonus : 0,
     cycleWaterWeight: cyc.waterWeightLikely,
     exerciseKcal: eatBack(raw.profile.goal, extra.kcal),
@@ -153,7 +154,8 @@ function extraBurn(raw: Raw, date: string) {
       kcal += (met - 1) * kg * ((d.minutes ?? 30) / 60);
     }
   }
-  return { kcal: Math.round(kcal) };
+  // a typo like "300 dk" must not turn into a 10,000 kcal menu
+  return { kcal: Math.min(1200, Math.round(kcal)) };
 }
 
 function cycleFor(raw: Raw, date: string) {
@@ -211,8 +213,9 @@ function scoreDay(raw: Raw, eng: EngineResult, date: string, partnerWalks: Set<s
   if (p.goal === "gain") {
     add("kcal", `En az ${Math.round(t.kcal * 0.95)} kcal`, kcal >= t.kcal * 0.95, 20, Math.round(Math.min(1, kcal / t.kcal) * 20));
   } else {
-    const inBand = kcal >= t.kcal * 0.85 && kcal <= t.kcal * 1.1 && kcal >= 1000;
-    add("kcal", `Kalori ${Math.round(t.kcal * 0.85)}-${Math.round(t.kcal * 1.1)} arası`, inBand, 20);
+    const lo = Math.max(eng.floor, Math.round(t.kcal * 0.85)); // never reward eating under the safety floor
+    const inBand = kcal >= lo && kcal <= t.kcal * 1.1;
+    add("kcal", `Kalori ${lo}-${Math.round(t.kcal * 1.1)} arası`, inBand, 20);
   }
   add("water", `${WATER_TARGET} bardak su`, water >= WATER_TARGET, 40, Math.min(WATER_TARGET, water) * 5);
   add("steps", `${t.steps.toLocaleString("tr-TR")} adım`, steps >= t.steps, 20, Math.round(Math.min(1, steps / t.steps) * 20));
@@ -220,7 +223,7 @@ function scoreDay(raw: Raw, eng: EngineResult, date: string, partnerWalks: Set<s
   else add("cardio", "Sahil yürüyüşü / hafif kardiyo", !!cardio || strength, 20);
   add("sleep", "7+ saat uyku", (sleep ?? 0) >= 7, 10);
 
-  for (const td of raw.todos.filter((x) => x.date === date)) {
+  for (const td of raw.todos.filter((x) => x.date === date).slice(0, 3)) {
     add("todo:" + td.id, td.data.text, td.data.done, 10);
   }
 
@@ -449,11 +452,10 @@ export async function buildState(user: UserId) {
     habitDay: eng.dayIndex + 1,
     scores: {
       me: { total: me.total, week: myWeek?.points ?? 0, completion: myWeek?.completion ?? 0, streak: me.streak, level: levelFor(me.total), today: todayScore.points, weeks: me.weeks.slice(-8) },
-      partner: { name: praw.profile.name, total: them.total, week: theirWeek?.points ?? 0, completion: theirWeek?.completion ?? 0, streak: them.streak, level: levelFor(them.total), today: partnerToday.points, weeks: them.weeks.slice(-8), todayTasks: partnerToday.tasks.map((t) => ({ label: t.label, done: t.done })) },
+      partner: { name: praw.profile.name, total: them.total, week: theirWeek?.points ?? 0, completion: theirWeek?.completion ?? 0, streak: them.streak, level: levelFor(them.total), today: partnerToday.points, weeks: them.weeks.slice(-8), todayTasks: partnerToday.tasks.map((t) => ({ id: t.id.startsWith("todo:") ? "todo" : t.id, done: t.done })) },
       couple: (((myWeek?.completion ?? 0) + (theirWeek?.completion ?? 0)) / 2),
       weeksWon,
     },
-    partnerPhase: pEng.phase,
     partnerProgress: {
       name: praw.profile.name,
       goal: praw.profile.goal,

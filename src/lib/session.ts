@@ -3,7 +3,11 @@ import { createHmac, timingSafeEqual } from "crypto";
 import type { UserId } from "./store";
 
 const COOKIE = "ikimiz_who";
-const secret = () => process.env.SESSION_SECRET || "dev-secret-change-me";
+const secret = () => {
+  const s = process.env.SESSION_SECRET;
+  if (!s && process.env.VERCEL) throw new Error("SESSION_SECRET missing"); // never sign with a public default in production
+  return s || "dev-secret-change-me";
+};
 
 function sign(v: string) {
   return createHmac("sha256", secret()).update(v).digest("base64url");
@@ -27,7 +31,8 @@ export async function clearSession() {
 export async function getSession(): Promise<UserId | null> {
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
-  const [user, sig] = raw.split(".");
+  const [user, sig, extra] = raw.split(".");
+  if (extra !== undefined) return null;
   if (user !== "tolga" && user !== "eylul") return null;
   const a = Buffer.from(sig ?? "");
   const b = Buffer.from(sign(user));

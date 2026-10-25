@@ -27,15 +27,25 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
   const [tab, setTab] = useState<TabId>("bugun");
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [err, setErr] = useState("");
+  const [loadErr, setLoadErr] = useState(false);
   const [fire, setFire] = useState(0);
 
   const reload = useCallback(async () => {
-    const r = await fetch("/api/state", { cache: "no-store" });
+    let r: Response;
+    try {
+      r = await fetch("/api/state", { cache: "no-store" });
+    } catch {
+      setLoadErr(true);
+      return;
+    }
     if (r.status === 401) {
       router.replace("/");
       return;
     }
-    if (r.ok) setS(await r.json());
+    if (r.ok) {
+      setS(await r.json());
+      setLoadErr(false);
+    } else setLoadErr(true);
   }, [router]);
 
   useEffect(() => {
@@ -83,7 +93,17 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
           <span />
           <span />
         </div>
-        <p className="display text-2xl font-bold text-grad">Plan hazırlanıyor…</p>
+        {loadErr ? (
+          <div className="relative z-10 text-center px-6">
+            <p className="display text-2xl font-bold">Sunucuya ulaşamadım</p>
+            <p className="mt-1" style={{ color: "var(--ink-2)" }}>İnternetini kontrol edip tekrar dene.</p>
+            <button className="btn btn-me mt-4 press" onClick={() => reload()}>
+              Tekrar dene
+            </button>
+          </div>
+        ) : (
+          <p className="display text-2xl font-bold text-grad">Plan hazırlanıyor…</p>
+        )}
       </main>
     );
   }
