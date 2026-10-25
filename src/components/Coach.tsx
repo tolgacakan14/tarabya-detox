@@ -24,20 +24,32 @@ export default function Coach() {
       .then((j) => {
         setMsgs(j.messages ?? []);
         setAi(!!j.ai);
-      });
+      })
+      .catch(() => {});
   }, []);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [msgs, busy]);
+  // Note: scrollIntoView returns a Promise in recent Chrome; never return it from an effect.
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [msgs, busy]);
 
   async function send(m: string) {
     if (!m.trim() || busy) return;
     setText("");
     setMsgs((x) => [...x, { role: "user", content: m }]);
     setBusy(true);
-    const r = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ message: m }) });
-    const j = await r.json();
+    let reply = "Bağlantı koptu, bir daha dener misin?";
+    let changed = false;
+    try {
+      const r = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ message: m }) });
+      const j = await r.json().catch(() => ({}));
+      reply = (r.ok ? j.reply : j.error) || reply;
+      changed = !!j.changed;
+    } catch {
+      /* network error: keep the friendly message */
+    }
     setBusy(false);
-    setMsgs((x) => [...x, { role: "assistant", content: r.ok ? j.reply : j.error }]);
-    if (j.changed) reload();
+    setMsgs((x) => [...x, { role: "assistant", content: reply }]);
+    if (changed) reload();
   }
 
   return (

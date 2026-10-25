@@ -66,7 +66,7 @@ export function defaultProfile(id: UserId, startDate: string): Profile {
     age: 22,
     heightCm: 158,
     startWeight: 55,
-    targetWeight: 51, // first milestone; final goal re-evaluated later
+    targetWeight: 50,
     goal: "lose",
     startDate,
     activity: 1.25,

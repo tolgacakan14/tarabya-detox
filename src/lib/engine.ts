@@ -188,7 +188,7 @@ export function runEngine(
       insights.push({ tone: "good", text: "Bakım dönemindesin. Bu bir mola değil, planın parçası: vücudun ve kafan dinleniyor, sonra açık daha kolay gidiyor." });
     } else if (reachedGoal) {
       phase = "maintenance";
-      insights.push({ tone: "good", text: "Ara hedefine ulaştın. Şimdi 4 hafta bakım, sonra birlikte yeniden bakarız." });
+      insights.push({ tone: "good", text: "Hedefine ulaştın! Şimdi bakım dönemi: kilonu korumaya odaklanıyoruz." });
     }
     kcal = phase === "maintenance" ? tdee : tdee - 250;
     if (phase === "deficit" && weeklyRate !== null && weeklyRate < -0.007 * currentWeight) {
@@ -236,7 +236,8 @@ export function runEngine(
         ]
       : [
           { label: "İlk 2 kg", weight: Math.round((p.startWeight - 2) * 10) / 10 },
-          { label: "Ara hedef", weight: p.targetWeight },
+          { label: "Yarı yol", weight: Math.round(((p.startWeight + p.targetWeight) / 2) * 10) / 10 },
+          { label: "Hedef", weight: p.targetWeight },
         ];
   const ms = milestones.map((m) => ({
     ...m,

@@ -58,12 +58,12 @@ export default function Onboarding() {
               <L label="Yaş"><input className="field num" inputMode="numeric" value={f.age} onChange={set("age")} /></L>
               <L label="Boy (cm)"><input className="field num" inputMode="numeric" value={f.heightCm} onChange={set("heightCm")} /></L>
               <L label="Bugünkü kilo (kg)"><input className="field num" inputMode="decimal" value={f.startWeight} onChange={set("startWeight")} /></L>
-              <L label={gain ? "Hedef kilo (kg)" : "İlk ara hedef (kg)"}><input className="field num" inputMode="decimal" value={f.targetWeight} onChange={set("targetWeight")} /></L>
+              <L label="Hedef kilo (kg)"><input className="field num" inputMode="decimal" value={f.targetWeight} onChange={set("targetWeight")} /></L>
               <L label="Günde yaklaşık kaç adım atıyorsun?"><input className="field num" inputMode="numeric" value={f.stepBaseline} onChange={set("stepBaseline")} /></L>
             </div>
             {!gain && (
               <p className="text-sm" style={{ color: "var(--ink-2)" }}>
-                Önce 4 kg'lık ara hedefe gidiyoruz, sonra 4 hafta bakım yapıp birlikte bakacağız. Sağlıklı sınır olarak hedef 46.2 kg'ın altına inemiyor.
+                Yolda her 8 haftada bir kısa bakım dönemi olacak, böylece hem vücudun hem motivasyonun dinlenir. Sağlıklı sınır olarak hedef 46.2 kg'ın altına inemiyor.
               </p>
             )}
           </div>
