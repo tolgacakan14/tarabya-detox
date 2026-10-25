@@ -255,7 +255,8 @@ export function runEngine(
     steps = 7000;
   }
 
-  const sessionsPerWeek = p.goal === "gain" || intense ? 3 : week <= 4 ? 2 : 3;
+  // matches the 12-week program: the loser eases in with 2 sessions in weeks 1-2
+  const sessionsPerWeek = p.goal === "gain" ? 3 : week <= 2 ? 2 : 3;
 
   // Milestones
   const milestones =

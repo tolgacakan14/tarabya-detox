@@ -8,6 +8,7 @@ import { QUEST_IDS, SYMPTOMS } from "@/lib/cycle";
 import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
+import { LADDERS, PLANS, netKcal, type Effort } from "@/lib/training";
 import { boundedNumber, validDate, validFood } from "@/lib/validate";
 
 
@@ -42,6 +43,31 @@ export async function POST(req: Request) {
     // don't leak JS internals ("Cannot read properties of undefined…")
     return NextResponse.json({ error: e instanceof TypeError ? "Geçersiz istek" : msg }, { status: 400 });
   }
+}
+
+/** Guided program session: validate against the program, compute burn on the server. */
+async function cleanV2(user: UserId, v: unknown, minutes?: number): Promise<Partial<WorkoutLog>> {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const tpl = PLANS[user].templates.find((t) => t.id === o.template);
+  if (!tpl) throw new Error("Geçersiz antrenman");
+  const items = (Array.isArray(o.items) ? o.items : []).slice(0, 12).flatMap((x) => {
+    const it = x as Record<string, unknown>;
+    const ladder = LADDERS[String(it.ladder)];
+    if (!ladder) return [];
+    const step = Math.round(num(it.step, 0, ladder.steps.length - 1));
+    const sets = (Array.isArray(it.sets) ? it.sets : []).slice(0, 8).map((s) => Math.round(num(s || 0, 0, 600)));
+    const effort = ["easy", "right", "hard"].includes(String(it.effort)) ? (it.effort as Effort) : undefined;
+    return [{ ladder: ladder.id, step, sets, effort }];
+  });
+  if (!items.length) throw new Error("En az bir set kaydet");
+  const weights = await list<{ kg: number }>(user, "weight", addDays(today(), -60), today());
+  const kg = weights[weights.length - 1]?.data.kg ?? (await getProfile(user)).profile.startWeight;
+  const mins = minutes ? num(minutes, 1, 180) : 30;
+  return {
+    v2: { template: tpl.id, week: Math.round(num(o.week ?? 1, 1, 12)), items, prs: Math.round(num(o.prs ?? 0, 0, 30)), readiness: o.readiness === "light" ? "light" : "normal" },
+    session: tpl.id,
+    kcal: netKcal(tpl.met, kg, mins),
+  };
 }
 
 async function act(user: UserId, d: string, b: Body) {
@@ -134,6 +160,7 @@ async function act(user: UserId, d: string, b: Body) {
           level: Math.round(num(e.level, 0, 10)),
           sets: (Array.isArray(e.sets) ? e.sets : []).slice(0, 6).map((s) => Math.round(num(s || 0, 0, 200))),
         })),
+        ...(w.type === "strength" && w.v2 ? await cleanV2(user, w.v2, w.minutes) : {}),
       });
       return;
     }

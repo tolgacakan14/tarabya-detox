@@ -21,6 +21,7 @@ export interface WorkoutLog {
   activities?: Activity[];
   kcal?: number; // net kcal above rest, computed server-side
   muscles?: Partial<Record<Muscle, number>>;
+  v2?: V2Log; // guided 12-week program session
 }
 
 export interface Todo {
@@ -30,6 +31,7 @@ export interface Todo {
 }
 
 import { WATER_TARGET } from "./state-constants";
+import { trainingToday, v2Muscles, type V2Log } from "./training-plan";
 export { WATER_TARGET };
 const PROFILE_DATE = "0000-00-00";
 
@@ -446,8 +448,10 @@ export async function buildState(user: UserId) {
       musclesFromLabel(def.muscle).forEach((m, i) => (weekMuscles[m] = (weekMuscles[m] ?? 0) + (i === 0 ? done : done * 0.5)));
     }
     for (const [m, v] of Object.entries(w.data.muscles ?? {})) weekMuscles[m as Muscle] = (weekMuscles[m as Muscle] ?? 0) + (v ?? 0);
+    if (w.data.v2) for (const [m, v] of Object.entries(v2Muscles(w.data.v2))) weekMuscles[m as Muscle] = (weekMuscles[m as Muscle] ?? 0) + (v ?? 0);
   }
-  const muscleTarget = raw.profile.goal === "gain" ? (eng.week <= 3 ? 8 : eng.week <= 8 ? 12 : 14) : eng.week <= 6 ? 6 : 9;
+  const program = trainingToday(user, eng.week, today, raw.workouts);
+  const muscleTarget = program.volumeTarget;
 
   return {
     today,
@@ -470,6 +474,7 @@ export async function buildState(user: UserId) {
     sleep: dailyVal(raw.sleep, (d) => d.hours, today),
     weighedToday: raw.weights.find((w) => w.date === today)?.data.kg,
     workoutsToday: raw.workouts.filter((w) => w.date === today).map((w) => ({ id: w.id, ...w.data })),
+    program,
     plan: {
       training,
       session: nextSession,
