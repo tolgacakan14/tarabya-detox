@@ -503,7 +503,9 @@ function cleanItems(out: Record<string, unknown>): (FoodEntry & { low?: boolean 
       low: i.confidence === "low",
       };
     })
-    .filter((i) => i.name.trim());
+    .filter((i) => i.name.trim())
+    // models sometimes repeat the same item; keep one
+    .filter((i, k, all) => all.findIndex((x) => x.name === i.name && x.amount === i.amount && x.kcal === i.kcal) === k);
 }
 
 export async function estimateFood(text: string, image?: string): Promise<(FoodEntry & { low?: boolean })[]> {
