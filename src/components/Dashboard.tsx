@@ -63,7 +63,10 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
     setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), 2600);
   }, []);
 
-  const celebrate = useCallback(() => setFire((f) => f + 1), []);
+  const celebrate = useCallback(() => {
+    setFire((f) => f + 1);
+    window.dispatchEvent(new Event("ikimiz:dance")); // the characters dance along
+  }, []);
 
   const act = useCallback(
     async (body: Record<string, unknown>, opts?: { toast?: string; points?: number; celebrate?: boolean }) => {

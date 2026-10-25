@@ -82,13 +82,68 @@ export const PHASES: Record<PhaseKey, { label: string; emoji: string; color: str
     emoji: "🌘",
     color: "#a855f7",
     tips: {
-      food: "Bu hafta hedefine +150 kcal 'döngü payı' eklendi. Tatlı isteğine plan yap: bitter çikolata, hurma, sütlaç gibi küçük porsiyonlar.",
+      food: "Bu günlerde hedefine küçük bir 'döngü payı' eklendi. Tatlı isteğine plan yap: bitter çikolata, hurma, sütlaç gibi küçük porsiyonlar.",
       hunger: "Açlık ve tatlı isteği artabilir; bu hormonal ve tamamen normal, kendini suçlama.",
       training: "Yorgun hissedersen 5 dakikalık mini antrenman ya da yürüyüş da sayılır.",
       scale: "Su tutulumu 0.5–2 kg ekleyebilir. Bu günlerdeki tartı yağ değil; trende bak.",
     },
   },
 };
+
+/** "Inner seasons": a friendly way to read the phases, plus three tiny quests per phase. */
+export const SEASONS: Record<PhaseKey, { season: string; mood: string; power: string; quests: { id: string; text: string; emoji: string }[] }> = {
+  menstrual: {
+    season: "Kış",
+    mood: "Yavaşla, kendine iyi bak",
+    power: "Dinlenme süper gücü: bugün az ama düzenli hareket yeter.",
+    quests: [
+      { id: "m_soup", text: "Bir kase mercimek çorbası ya da kırmızı et", emoji: "🥣" },
+      { id: "m_stretch", text: "10 dakika esneme ya da yoga", emoji: "🧘‍♀️" },
+      { id: "m_water", text: "Bir bardak sıcak su veya bitki çayı", emoji: "🍵" },
+    ],
+  },
+  follicular: {
+    season: "İlkbahar",
+    mood: "Enerjin yükseliyor",
+    power: "Güç süper gücü: antrenmanda bir tekrar fazlasını dene.",
+    quests: [
+      { id: "f_rep", text: "Antrenmanda bir set ya da tekrar artır", emoji: "💪" },
+      { id: "f_walk", text: "30 dakika tempolu sahil yürüyüşü", emoji: "🌊" },
+      { id: "f_new", text: "Menüden yeni bir sebze dene", emoji: "🥦" },
+    ],
+  },
+  ovulatory: {
+    season: "Yaz",
+    mood: "Parıldıyorsun",
+    power: "Zirve süper gücü: kendini güçlü hissettiğin günler, formunu koruyarak zorla.",
+    quests: [
+      { id: "o_pr", text: "Bir harekette kişisel rekorunu dene", emoji: "🏆" },
+      { id: "o_run", text: "Yürü-koş aralığını 1 dakika uzat", emoji: "🏃‍♀️" },
+      { id: "o_protein", text: "Her öğünde avuç içi kadar protein", emoji: "🍳" },
+    ],
+  },
+  luteal: {
+    season: "Sonbahar",
+    mood: "Sakin ve istikrarlı",
+    power: "İstikrar süper gücü: öğün atlamadan plana sadık kal.",
+    quests: [
+      { id: "l_fiber", text: "Bir öğüne baklagil ya da salata ekle", emoji: "🥗" },
+      { id: "l_sleep", text: "Bu gece 7+ saat uyku", emoji: "😴" },
+      { id: "l_snack", text: "Ara öğünü yoğurtla planla", emoji: "🥛" },
+    ],
+  },
+  premenstrual: {
+    season: "Sonbahar sonu",
+    mood: "Kendine şefkatli ol",
+    power: "Şefkat süper gücü: tatlı isteği hormonal, suçluluk yok, plan var.",
+    quests: [
+      { id: "p_choc", text: "Tatlı isteğine 2 kare bitter çikolata", emoji: "🍫" },
+      { id: "p_salt", text: "Bugün tuzu azalt, şişkinlik azalır", emoji: "🧂" },
+      { id: "p_walk", text: "Kısa bir akşam yürüyüşü", emoji: "🌙" },
+    ],
+  },
+};
+export const QUEST_IDS = Object.values(SEASONS).flatMap((x) => x.quests.map((q) => q.id));
 
 export interface CycleInfo {
   hasData: boolean;

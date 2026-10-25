@@ -1,5 +1,5 @@
 "use client";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AppCtx } from "./ui";
 // Memoji-style soft-3D portraits of Tolga and Eylül in a round, colourful frame (SVG).
 // Volume comes from gradients, not outlines. Expression follows today's completion;
@@ -372,7 +372,60 @@ function EylulMouth({ mood }: { mood: Mood }) {
 const MOOD_EMOJI: Record<Mood, string | null> = { calm: null, happy: null, proud: "💪", party: "🎉" };
 
 /** Real profile photo when one is uploaded (exact likeness), otherwise the drawn character. */
+const DANCES = ["dance-sway", "dance-hop", "dance-groove"] as const;
+
+/** Soft, short dances: on every celebration, and now and then on its own (big avatars only). */
+function useDance(enabled: boolean, idle: boolean) {
+  const [move, setMove] = useState<string | null>(null);
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const play = () => {
+      setMove(DANCES[Math.floor(Math.random() * DANCES.length)]);
+      if (t.current) clearTimeout(t.current);
+      t.current = setTimeout(() => setMove(null), 1900);
+    };
+    window.addEventListener("ikimiz:dance", play);
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      idleTimer = setTimeout(() => {
+        if (document.visibilityState === "visible") play();
+        schedule();
+      }, 25000 + Math.random() * 35000);
+    };
+    let hello: ReturnType<typeof setTimeout> | undefined;
+    if (idle) {
+      hello = setTimeout(play, 1800 + Math.random() * 1500); // a little hello when the screen opens
+      schedule();
+    }
+    return () => {
+      window.removeEventListener("ikimiz:dance", play);
+      if (idleTimer) clearTimeout(idleTimer);
+      if (hello) clearTimeout(hello);
+      if (t.current) clearTimeout(t.current);
+    };
+  }, [enabled, idle]);
+  return move;
+}
+
 export default function Avatar(props: Props) {
+  const { size = 160, bob = true } = props;
+  const move = useDance(size >= 56, bob && size >= 80);
+  return (
+    <span className={`relative inline-block ${move ?? ""}`} style={{ width: size, height: size }}>
+      <AvatarInner {...props} />
+      {move && (
+        <span className="dance-notes" aria-hidden>
+          <i>♪</i>
+          <i>♫</i>
+          <i>✦</i>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function AvatarInner(props: Props) {
   const { who, mood = "happy", level = 1, size = 160, className = "", bob = true } = props;
   const ctx = useContext(AppCtx);
   const known = ctx?.s.avatars;

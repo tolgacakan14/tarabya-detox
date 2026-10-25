@@ -224,6 +224,10 @@ function scoreDay(raw: Raw, eng: EngineResult, date: string, partnerWalks: Set<s
   if (training) add("workout", "Antrenman", strength, 40, strength ? 40 : mini ? 15 : 0, mini && !strength ? "Mini antrenman 15 puan" : undefined);
   else add("cardio", "Sahil yürüyüşü / hafif kardiyo", !!cardio || strength, 20);
   add("sleep", "7+ saat uyku", (sleep ?? 0) >= 7, 10);
+  if (p.sex === "f" && p.cycleTracking !== false && raw.cycle.length) {
+    const cd = raw.cycle.find((c) => c.date === date)?.data as { energy?: number } | undefined;
+    add("cycle", "Döngü check-in", !!cd?.energy, 10, undefined, "Bugün nasılsın? emojisine dokun");
+  }
 
   for (const td of raw.todos.filter((x) => x.date === date).slice(0, 3)) {
     add("todo:" + td.id, td.data.text, td.data.done, 10);

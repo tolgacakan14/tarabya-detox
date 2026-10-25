@@ -4,7 +4,7 @@ import { add, list, remove, setDaily, update, type UserId } from "@/lib/store";
 import { getProfile, saveProfile, type Todo, type WorkoutLog } from "@/lib/state";
 import { clampTargetWeight, type FoodEntry } from "@/lib/engine";
 import { addDays, nowTime, today } from "@/lib/dates";
-import { SYMPTOMS } from "@/lib/cycle";
+import { QUEST_IDS, SYMPTOMS } from "@/lib/cycle";
 import { logCustomWorkout, sanitizeActivities } from "@/lib/workouts-server";
 import { PARTNER, type Profile } from "@/lib/profiles";
 import { FOODS } from "@/lib/foods";
@@ -204,6 +204,8 @@ async function act(user: UserId, d: string, b: Body) {
       if (b.end !== undefined) next.end = !!b.end;
       if (b.flow !== undefined) next.flow = b.flow === null ? undefined : Math.round(num(b.flow, 1, 3));
       if (b.energy !== undefined) next.energy = b.energy === null ? undefined : Math.round(num(b.energy, 1, 5));
+      if (Array.isArray(b.quests)) next.quests = (b.quests as unknown[]).map(String).filter((x) => QUEST_IDS.includes(x)).slice(0, 6);
+      if (b.mood !== undefined) next.mood = b.mood === null ? undefined : String(b.mood).slice(0, 8);
       if (Array.isArray(b.symptoms)) next.symptoms = (b.symptoms as unknown[]).map(String).filter((x) => SYMPTOMS.some((s) => s.id === x)).slice(0, 10);
       await setDaily(user, "cycle", date, next);
       return;

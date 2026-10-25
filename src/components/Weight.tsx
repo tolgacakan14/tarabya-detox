@@ -288,7 +288,7 @@ export function WeightCharts({ compact = false }: { compact?: boolean }) {
         )}
       </div>
 
-      {view === "me" && (
+      {view === "me" && s.engine.trend.length > 0 && (
         <p className="text-sm mt-2" style={{ color: "var(--ink-2)" }}>
           <b style={{ color: "var(--ink)" }}>
             {change(s.engine.currentWeight, p.startWeight) > 0 ? "+" : ""}
@@ -301,7 +301,7 @@ export function WeightCharts({ compact = false }: { compact?: boolean }) {
           {!compact && bands.length > 0 && " Pembe alanlar adet günlerin: o günlerdeki artış genelde su."}
         </p>
       )}
-      {view === "partner" && (
+      {view === "partner" && pp.trend.length > 0 && (
         <p className="text-sm mt-2" style={{ color: "var(--ink-2)" }}>
           {pp.name}:{" "}
           <b style={{ color: "var(--ink)" }}>
