@@ -52,7 +52,7 @@ export default function ProfilePicker() {
           >
             <Tide who={p.id} />
             <div className="relative flex-1 flex items-center justify-center pb-2">
-              <Avatar who={p.id} mood="happy" size={150} className="sm:w-[240px] sm:h-[288px]" />
+              <Avatar who={p.id} mood="happy" size={160} className="sm:w-[240px] sm:h-[240px]" />
             </div>
             <span className="relative display font-bold leading-[0.85] text-[18vw] sm:text-[8rem] transition-transform group-hover:-translate-y-1">
               {p.name}
