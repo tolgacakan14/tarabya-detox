@@ -1,5 +1,6 @@
 "use client";
 import QuickLog from "./QuickLog";
+import { TogetherStreak } from "./CoupleMeter";
 import { usePhotoPicker } from "./PhotoAvatar";
 import { WeighIn, WeightCharts } from "./Weight";
 // Home: deliberately simple. Where am I (kg + progress bar), today's three rings, and the one next thing to do.
@@ -287,6 +288,7 @@ function PartnerStrip() {
           {pp.name}: {{ highfive: "sana beşlik çaktı 🙌", cheer: "tezahürat yapıyor 📣", proud: "seninle gurur duyuyor 💛", walk: "seni sahile çağırıyor 🌊" }[s.reactions[0].type] ?? "bir şey gönderdi"}
         </p>
       )}
+      <TogetherStreak />
     </section>
   );
 }

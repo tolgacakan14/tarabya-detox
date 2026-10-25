@@ -349,6 +349,32 @@ function exerciseMemory(raw: Raw) {
   return mem;
 }
 
+/** Shared daily streak: a day counts when BOTH logged ≥2 meals. A freeze bank (max 2, +1 per 7 days)
+ * covers a missed day; today never breaks the streak while it's still going. */
+function coupleStreak(a: Raw, b: Raw, today: string) {
+  const meals = (raw: Raw, d: string) => {
+    const fs = raw.foods.filter((f) => f.date === d);
+    return new Set(fs.map((f, i) => f.data.meal ?? `x${i}`)).size;
+  };
+  const start = a.profile.startDate > b.profile.startDate ? a.profile.startDate : b.profile.startDate;
+  let streak = 0,
+    freezes = 0,
+    best = 0;
+  for (let d = start; d < today; d = addDays(d, 1)) {
+    if (meals(a, d) >= 2 && meals(b, d) >= 2) {
+      streak++;
+      if (streak % 7 === 0) freezes = Math.min(2, freezes + 1);
+    } else if (streak > 0 && freezes > 0) freezes--;
+    else streak = 0;
+    best = Math.max(best, streak);
+  }
+  const meToday = meals(a, today),
+    themToday = meals(b, today);
+  const todayDone = meToday >= 2 && themToday >= 2;
+  if (todayDone) streak++;
+  return { days: streak, freezes, best: Math.max(best, streak), todayDone, meToday: Math.min(2, meToday), themToday: Math.min(2, themToday) };
+}
+
 export async function buildState(user: UserId) {
   const today = todayFn();
   const partner = PARTNER[user];
@@ -391,10 +417,13 @@ export async function buildState(user: UserId) {
 
   // what they actually eat: counts by list food id + favourites for one-tap relog
   const eatenCounts: Record<string, number> = {};
+  const recentCounts: Record<string, number> = {}; // last 7 days before today, for menu variety
+  const weekAgo = addDays(today, -7);
   const favMap = new Map<string, { entry: FoodEntry; n: number; last: string }>();
   for (const f of raw.foods) {
     const id = FOODS.find((x) => x.name === f.data.name)?.id;
     if (id) eatenCounts[id] = (eatenCounts[id] ?? 0) + 1;
+    if (id && f.date >= weekAgo && f.date < today) recentCounts[id] = (recentCounts[id] ?? 0) + 1;
     const key = f.data.name + "|" + (f.data.amount ?? "");
     const cur = favMap.get(key);
     favMap.set(key, { entry: f.data, n: (cur?.n ?? 0) + 1, last: f.date });
@@ -427,6 +456,7 @@ export async function buildState(user: UserId) {
     muscleTarget,
     extraBurnToday: extraBurn(raw, today).kcal,
     eatenCounts,
+    recentCounts,
     favorites,
     yesterdayFoods,
     lastWeight,
@@ -461,6 +491,7 @@ export async function buildState(user: UserId) {
       partner: { name: praw.profile.name, total: them.total, week: theirWeek?.points ?? 0, completion: theirWeek?.completion ?? 0, streak: them.streak, level: levelFor(them.total), today: partnerToday.points, weeks: them.weeks.slice(-8), todayTasks: partnerToday.tasks.map((t) => ({ id: t.id.startsWith("todo:") ? "todo" : t.id, done: t.done })) },
       couple: (((myWeek?.completion ?? 0) + (theirWeek?.completion ?? 0)) / 2),
       weeksWon,
+      together: coupleStreak(raw, praw, today),
     },
     partnerProgress: {
       name: praw.profile.name,

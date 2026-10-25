@@ -143,6 +143,7 @@ export function buildMenu(opts: {
   prefs: Record<string, number>;
   seed: number;
   slotSeeds?: Record<number, number>;
+  recent?: Record<string, number>; // times eaten in the last 7 days
 }): DayMenu {
   const { goal, prefs } = opts;
   const known = Object.values(prefs).filter((v) => v > 0).length;
@@ -158,6 +159,12 @@ export function buildMenu(opts: {
     if (goal === "lose" && f.tags.includes("light")) s += 1.2;
     if (goal === "lose" && f.tags.includes("dense")) s -= 0.6;
     if (f.tags.includes("protein")) s += 0.8;
+    // variety across days (Epstein 2011: daily repetition dulls appetite): mains capped per week,
+    // the gainer rotates more, the loser can keep filling staples. Loved foods not seen this week get a nudge.
+    const role = META[f.id]?.role;
+    const seen = opts.recent?.[f.id] ?? 0;
+    if ((role === "protein" || role === "dish") && seen >= (goal === "gain" ? 2 : 3)) s *= 0.3;
+    if (p === 2 && seen === 0) s *= 1.3;
     return Math.max(0.2, s);
   };
 

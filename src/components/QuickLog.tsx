@@ -44,6 +44,53 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
   const [err, setErr] = useState("");
   const cam = useRef<HTMLInputElement>(null);
   const gal = useRef<HTMLInputElement>(null);
+  const [rec, setRec] = useState<"idle" | "rec" | "up">("idle");
+  const media = useRef<{ r: MediaRecorder; chunks: Blob[]; stop: ReturnType<typeof setTimeout> } | null>(null);
+
+  // 🎤 tap to talk, tap again to stop (max 30 s). Whisper on the server understands Turkish well.
+  async function toggleVoice() {
+    if (rec === "rec" && media.current) {
+      clearTimeout(media.current.stop);
+      media.current.r.stop();
+      return;
+    }
+    if (rec !== "idle") return;
+    setErr("");
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setErr("Mikrofon izni gerekli. Tarayıcı ayarlarından izin verip tekrar dene.");
+      return;
+    }
+    const mime = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg"].find((m) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported?.(m));
+    const r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks: Blob[] = [];
+    r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    r.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setRec("up");
+      try {
+        const fd = new FormData();
+        fd.append("audio", new Blob(chunks, { type: r.mimeType || mime || "audio/webm" }));
+        const res = await fetch("/api/voice", { method: "POST", body: fd });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) setErr(j.error ?? "Sesi anlayamadım");
+        else {
+          setText(j.text);
+          setRec("idle");
+          await estimate(j.text);
+          return;
+        }
+      } catch {
+        setErr("Bağlantı koptu, tekrar dener misin?");
+      }
+      setRec("idle");
+    };
+    r.start();
+    media.current = { r, chunks, stop: setTimeout(() => r.state === "recording" && r.stop(), 30000) };
+    setRec("rec");
+  }
 
   async function estimate(t: string, image?: string) {
     setBusy(true);
@@ -123,14 +170,23 @@ export default function QuickLog({ onDone, autoFocus = false }: { onDone?: () =>
               {busy && !photo ? "…" : "Hesapla"}
             </button>
           </form>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <button className="btn btn-ghost press !py-3" onClick={() => cam.current?.click()} disabled={busy}>
-              📷 Tabağı çek
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <button className="btn btn-ghost press !py-3 !px-2" onClick={() => cam.current?.click()} disabled={busy || rec !== "idle"}>
+              📷 Çek
             </button>
-            <button className="btn btn-ghost press !py-3" onClick={() => gal.current?.click()} disabled={busy}>
-              🖼️ Galeriden
+            <button
+              className={`btn press !py-3 !px-2 ${rec === "rec" ? "btn-me shine" : "btn-ghost"}`}
+              onClick={toggleVoice}
+              disabled={busy || rec === "up"}
+              aria-label={rec === "rec" ? "Kaydı bitir" : "Sesle söyle"}
+            >
+              {rec === "rec" ? "⏹ Bitti" : rec === "up" ? "…" : "🎤 Söyle"}
+            </button>
+            <button className="btn btn-ghost press !py-3 !px-2" onClick={() => gal.current?.click()} disabled={busy || rec !== "idle"}>
+              🖼️ Galeri
             </button>
           </div>
+          {rec === "rec" && <p className="label mt-2 text-center">Dinliyorum… ne yediğini söyle, bitince ⏹ dokun.</p>}
           <input ref={cam} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
           <input ref={gal} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
         </>

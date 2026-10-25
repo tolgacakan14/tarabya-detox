@@ -39,9 +39,39 @@ export default function CoupleMeter() {
           <p className="display text-2xl font-bold num" style={{ color: `var(--${partnerId})` }}>{them.week}</p>
         </div>
       </div>
+      <TogetherStreak />
       <p className="text-center font-semibold mt-2">
         {lead > 0 ? `Bu hafta ${lead} puan öndesin 🔥` : lead < 0 ? `${them.name} ${-lead} puan önde, yetiş! 🏃` : "Başa başsınız ⚖️"}
       </p>
     </section>
+  );
+}
+
+/** "İkimiz de kaydettik" daily streak with a freeze bank. Never says who broke it. */
+export function TogetherStreak() {
+  const { s } = useApp();
+  const t = s.scores.together;
+  const dots = (n: number) => (
+    <span className="inline-flex gap-0.5 align-middle">
+      {[0, 1].map((i) => (
+        <span key={i} className="w-2 h-2 rounded-full" style={{ background: i < n ? "var(--me)" : "var(--line)" }} />
+      ))}
+    </span>
+  );
+  return (
+    <div className="mt-3 rounded-2xl px-3 py-2.5 flex items-center gap-3" style={{ background: t.todayDone ? "var(--me-soft)" : "var(--paper-2, #f6f4fb)" }}>
+      <span className={`text-3xl ${t.days > 0 ? "" : "grayscale opacity-50"}`} aria-hidden>
+        🔥
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold leading-tight">
+          <span className="num">{t.days}</span> gün birlikte kaydettik
+          {t.freezes > 0 && <span className="label"> · ❄️ {t.freezes}</span>}
+        </p>
+        <p className="label">
+          {t.todayDone ? "Bugün tamam, seri devam ediyor 🎉" : <>Bugün: sen {dots(t.meToday)} · {s.scores.partner.name} {dots(t.themToday)} (ikiniz de 2 öğün)</>}
+        </p>
+      </div>
+    </div>
   );
 }

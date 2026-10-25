@@ -16,8 +16,8 @@ export function useMenu(s: AppState) {
   });
   const prefs = useMemo(() => effectivePrefs(s.profile.foodPrefs, s.eatenCounts), [s.profile.foodPrefs, s.eatenCounts]);
   const menu = useMemo(
-    () => buildMenu({ goal: s.profile.goal, kcal: s.engine.targets.kcal, protein: s.engine.targets.protein, prefs, seed: hashSeed(s.user + s.today), slotSeeds: rolls }),
-    [s.profile.goal, s.engine.targets.kcal, s.engine.targets.protein, prefs, s.user, s.today, rolls]
+    () => buildMenu({ goal: s.profile.goal, kcal: s.engine.targets.kcal, protein: s.engine.targets.protein, prefs, seed: hashSeed(s.user + s.today), slotSeeds: rolls, recent: s.recentCounts }),
+    [s.profile.goal, s.engine.targets.kcal, s.engine.targets.protein, prefs, s.user, s.today, rolls, s.recentCounts]
   );
   const reroll = useCallback(
     (idx: number) => {
