@@ -225,23 +225,38 @@ export async function extractVision(system: string, text: string, imageDataUrl: 
   if (p) {
     const model = await pickVisionModel(p);
     if (!model) throw new Error("Görsel tanıyan model bulunamadı");
-    const r = await fetch(`${p.base}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: 900,
-        tools: [{ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.input_schema } }],
-        tool_choice: { type: "function", function: { name: tool.name } },
-        messages: [
-          { role: "system", content: system + `\nSonucu ${tool.name} aracıyla ver.` },
-          { role: "user", content: [{ type: "text", text: text || "Bu tabakta ne var? Yemekleri ve porsiyonları çıkar." }, { type: "image_url", image_url: { url: imageDataUrl } }] },
-        ],
-      }),
-    });
+    const userContent = [{ type: "text", text: text || "Bu tabakta ne var? Yemekleri ve porsiyonları çıkar." }, { type: "image_url", image_url: { url: imageDataUrl } }];
+    const call = (withTools: boolean) =>
+      fetch(`${p.base}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          max_tokens: 900,
+          ...(withTools
+            ? { tools: [{ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.input_schema } }], tool_choice: { type: "function", function: { name: tool.name } } }
+            : {}),
+          messages: [
+            {
+              role: "system",
+              content: withTools
+                ? system + `\nSonucu ${tool.name} aracıyla ver.`
+                : system + `\nYalnızca şu şemaya uyan tek bir JSON nesnesi döndür, başka metin yazma: ${JSON.stringify(tool.input_schema)}`,
+            },
+            { role: "user", content: userContent },
+          ],
+        }),
+      });
+    // Some vision models reject forced tool calls; fall back to plain JSON output.
+    let r = await call(true);
+    if (!r.ok && r.status !== 429) {
+      console.error("vision tools", r.status, (await r.text()).slice(0, 300));
+      r = await call(false);
+    }
     if (!r.ok) {
       const body = await r.text();
+      console.error("vision", model, r.status, body.slice(0, 300));
       delete visionChosen[p.name];
       if (r.status === 429) throw new Error("Ücretsiz kota şu an dolu, birkaç dakika sonra tekrar dene.");
       throw new Error(`${p.name} ${r.status}: ${body.slice(0, 160)}`);

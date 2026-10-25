@@ -440,8 +440,11 @@ export async function estimateFood(text: string, image?: string): Promise<FoodEn
       text,
       image,
       FOOD_TOOL
-    );
-    return cleanItems(out);
+    ).catch((e) => {
+      if (text.trim()) return null; // photo failed but we have words: use them
+      throw e;
+    });
+    if (out) return cleanItems(out);
   }
   return cleanItems(await extract(FOOD_SYSTEM, text, FOOD_TOOL));
 }

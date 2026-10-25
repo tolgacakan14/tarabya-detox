@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ items });
   } catch (e) {
     const msg = (e as Error).message;
+    console.error("estimate", image ? "image" : "text", msg);
     return NextResponse.json({ error: msg.startsWith("Ücretsiz kota") || msg.startsWith("AI anahtarı") ? msg : "Şu an hesaplayamadım, birazdan tekrar dene." }, { status: 500 });
   }
 }
