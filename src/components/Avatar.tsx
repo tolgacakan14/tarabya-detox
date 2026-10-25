@@ -372,6 +372,17 @@ function EylulMouth({ mood }: { mood: Mood }) {
 const MOOD_EMOJI: Record<Mood, string | null> = { calm: null, happy: null, proud: "💪", party: "🎉" };
 
 /** Real profile photo when one is uploaded (exact likeness), otherwise the drawn character. */
+let versionsP: Promise<Record<string, number | null>> | null = null;
+function usePublicVersions(enabled: boolean) {
+  const [v, setV] = useState<Record<string, number | null> | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    versionsP = versionsP ?? fetch("/api/avatars").then((r) => r.json()).catch(() => ({}));
+    versionsP.then(setV);
+  }, [enabled]);
+  return v as Record<"tolga" | "eylul", number | undefined> | null;
+}
+
 const DANCES = ["dance-sway", "dance-hop", "dance-groove"] as const;
 
 /** Soft, short dances: on every celebration, and now and then on its own (big avatars only). */
@@ -428,11 +439,12 @@ export default function Avatar(props: Props) {
 function AvatarInner(props: Props) {
   const { who, mood = "happy", level = 1, size = 160, className = "", bob = true } = props;
   const ctx = useContext(AppCtx);
-  const known = ctx?.s.avatars;
+  const fetched = usePublicVersions(!ctx);
+  const known = ctx ? ctx.s.avatars : fetched;
   const ver = known ? known[who] : undefined;
   const [failed, setFailed] = useState(false);
-  // inside the app we know whether a photo exists; on the profile picker we just try it
-  if (failed || (known && !ver)) return <MemojiAvatar {...props} />;
+  // no photo (or not known yet): the drawn character
+  if (failed || !known || !ver) return <MemojiAvatar {...props} />;
   const ring = who === "tolga" ? "linear-gradient(135deg,#ffd166,#ff4d6d)" : "linear-gradient(135deg,#7be0d0,#3a86ff)";
   const em = MOOD_EMOJI[mood];
   return (
