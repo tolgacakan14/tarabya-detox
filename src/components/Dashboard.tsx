@@ -90,14 +90,14 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
 
   return (
     <AppCtx.Provider value={{ s, act, reload, toast, celebrate, go }}>
-      <div data-user={user} className="min-h-dvh pb-28 sm:pb-10">
+      <div data-user={user} className="min-h-dvh pb-28">
         <div className="blobs" aria-hidden>
           <span />
           <span />
           <span />
         </div>
-        <header className="relative z-10 max-w-6xl mx-auto px-4 pt-5 sm:pt-7 flex items-center justify-between gap-3">
-          <h1 className="display text-3xl sm:text-4xl font-bold leading-tight">
+        <header className="relative z-10 max-w-md mx-auto px-4 pt-5 flex items-center justify-between gap-3">
+          <h1 className="display text-3xl font-bold leading-tight">
             Selam <span className="text-grad">{s.profile.name}</span>
           </h1>
           <div className="flex items-center gap-2">
@@ -117,23 +117,16 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
           </div>
         </header>
 
-        <nav className="relative z-10 hidden sm:flex gap-1.5 max-w-6xl mx-auto px-4 mt-4" aria-label="Bölümler">
-          {TABS.map((t) => (
-            <button key={t.id} className="chip press" aria-pressed={tab === t.id} onClick={() => go(t.id)}>
-              <span aria-hidden>{t.icon}</span> {t.label}
-            </button>
-          ))}
-        </nav>
 
         {err && (
-          <div className="max-w-6xl mx-auto px-4 mt-3">
+          <div className="max-w-md mx-auto px-4 mt-3">
             <p className="panel !py-3" role="alert" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
               {err}
             </p>
           </div>
         )}
 
-        <main className="relative z-10 max-w-6xl mx-auto px-4 mt-4">
+        <main className="relative z-10 max-w-md mx-auto px-4 mt-4">
           {tab === "bugun" && <Today />}
           {tab === "yemek" && <Food />}
           {tab === "antrenman" && <Workout />}
@@ -143,7 +136,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
         </main>
 
         <nav
-          className="sm:hidden fixed bottom-3 inset-x-3 grid grid-cols-6 rounded-3xl shadow-xl z-40"
+          className="fixed bottom-3 left-3 right-3 mx-auto max-w-[424px] grid grid-cols-6 rounded-3xl shadow-xl z-40"
           style={{ background: "var(--paper)", paddingBottom: "env(safe-area-inset-bottom)" }}
           aria-label="Bölümler"
         >
@@ -151,7 +144,7 @@ export default function Dashboard({ user }: { user: "tolga" | "eylul" }) {
             <button
               key={t.id}
               onClick={() => go(t.id)}
-              className="py-2 flex flex-col items-center gap-0.5 press"
+              className="min-h-[56px] py-2 flex flex-col items-center justify-center gap-0.5 press"
               aria-current={tab === t.id ? "page" : undefined}
             >
               <span className={`text-xl leading-none transition-transform ${tab === t.id ? "scale-125" : "opacity-60"}`} aria-hidden>

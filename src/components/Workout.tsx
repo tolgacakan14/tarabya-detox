@@ -38,7 +38,7 @@ export default function Workout() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <Section
         title={session.title}
         aside={

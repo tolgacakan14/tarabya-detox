@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useApp, Section } from "./ui";
+import { useApp } from "./ui";
 import Avatar from "./Avatar";
 
 type Msg = { id?: string; role: "user" | "assistant"; content: string };
@@ -53,65 +53,68 @@ export default function Coach() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4">
-      <Section className="flex flex-col min-h-[65vh] min-w-0">
-        <div className="flex-1 space-y-3 overflow-y-auto">
-          {msgs.length === 0 && (
-            <div className="text-center py-6">
-              <p className="display text-2xl font-bold">Koçunla konuş</p>
-              <p className="mt-2 mx-auto max-w-md" style={{ color: "var(--ink-2)" }}>
-                Ne yediğini, nasıl hissettiğini, gününün nasıl geçtiğini yaz. Yediklerini kaydeder, planını günceller, görev ekler.
-              </p>
-              {!ai && <p className="mt-3 text-sm" style={{ color: "var(--warn)" }}>Koç henüz bağlı değil: Vercel'e ücretsiz GROQ_API_KEY eklenince çalışacak.</p>}
-            </div>
-          )}
-          {msgs.map((m, i) => (
-            <div key={m.id ?? i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <p
-                className="max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5"
-                style={m.role === "user" ? { background: "var(--me)", color: "#fff" } : { background: "var(--mist)" }}
-              >
-                {m.content}
-              </p>
-            </div>
-          ))}
-          {busy && (
-            <p className="rounded-2xl px-4 py-2.5 inline-block" style={{ background: "var(--mist)", color: "var(--ink-2)" }}>
-              Düşünüyor…
-            </p>
-          )}
-          <div ref={end} />
+    // Full-height chat for phones: messages scroll inside, starters + input stay pinned above the bottom menu.
+    <section className="panel !p-0 flex flex-col overflow-hidden" style={{ height: "calc(100dvh - 176px - env(safe-area-inset-bottom))" }}>
+      <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--line)" }}>
+        <Avatar who={s.user} mood={busy ? "proud" : "happy"} size={40} bob={false} />
+        <div className="min-w-0">
+          <p className="display font-bold leading-tight">Koçun</p>
+          <p className="text-xs truncate" style={{ color: "var(--ink-3)" }}>{busy ? "yazıyor…" : "Yediklerini kaydeder, planını günceller"}</p>
         </div>
-        <div className="flex gap-2 scroll-x mt-3 max-w-full min-w-0">
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5" style={{ overscrollBehavior: "contain" }}>
+        {msgs.length === 0 && (
+          <div className="text-center py-8 px-2">
+            <p className="text-4xl" aria-hidden>💬</p>
+            <p className="display text-xl font-bold mt-2">Koçunla konuş</p>
+            <p className="mt-1 text-sm" style={{ color: "var(--ink-2)" }}>
+              Ne yediğini, nasıl hissettiğini yaz. Aşağıdaki hazır cümlelerle de başlayabilirsin.
+            </p>
+            {!ai && <p className="mt-3 text-sm" style={{ color: "var(--warn)" }}>Koç henüz bağlı değil.</p>}
+          </div>
+        )}
+        {msgs.map((m, i) => (
+          <div key={m.id ?? i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <p
+              className={`max-w-[82%] whitespace-pre-wrap px-3.5 py-2 text-[15px] leading-snug ${m.role === "user" ? "rounded-2xl rounded-br-md grad-me text-white" : "rounded-2xl rounded-bl-md"}`}
+              style={m.role === "user" ? undefined : { background: "var(--mist)" }}
+            >
+              {m.content}
+            </p>
+          </div>
+        ))}
+        {busy && (
+          <div className="flex justify-start">
+            <p className="rounded-2xl rounded-bl-md px-4 py-2.5 typing" style={{ background: "var(--mist)" }} aria-label="Koç yazıyor">
+              <span>•</span><span>•</span><span>•</span>
+            </p>
+          </div>
+        )}
+        <div ref={end} />
+      </div>
+
+      <div className="border-t px-3 pt-2 pb-3" style={{ borderColor: "var(--line)" }}>
+        <div className="flex gap-2 scroll-x max-w-full min-w-0 pb-2">
           {STARTERS[s.profile.goal].map((x) => (
-            <button key={x} className="chip whitespace-nowrap" onClick={() => send(x)} disabled={busy}>
+            <button key={x} className="chip whitespace-nowrap !text-[13px] !py-1.5 press" onClick={() => send(x)} disabled={busy}>
               {x}
             </button>
           ))}
         </div>
         <form
-          className="flex gap-2 mt-3"
+          className="flex gap-2 items-center"
           onSubmit={(e) => {
             e.preventDefault();
             send(text);
           }}
         >
-          <input className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="Bir şey yaz…" aria-label="Mesaj" />
-          <button className="btn btn-me" disabled={busy || !text.trim()}>
-            Gönder
+          <input className="field !rounded-full !py-3 text-[16px]" value={text} onChange={(e) => setText(e.target.value)} placeholder="Bir şey yaz…" aria-label="Mesaj" enterKeyHint="send" />
+          <button className="btn btn-me !rounded-full !w-12 !h-12 !p-0 shrink-0 press" disabled={busy || !text.trim()} aria-label="Gönder">
+            ➤
           </button>
         </form>
-      </Section>
-      <aside className="hidden lg:block">
-        <Section>
-          <div className="flex justify-center">
-            <Avatar who={s.user} mood="happy" level={s.scores.me.level.index} size={170} />
-          </div>
-          <p className="text-sm mt-3" style={{ color: "var(--ink-2)" }}>
-            Koç seni yargılamaz. Kilonu ya da kalorini {s.scores.partner.name} ile karşılaştırmaz. Sınırları güvenlik kurallarına bağlı: {s.profile.goal === "lose" ? `kalorin ${s.engine.floor} kcal'nin altına inemez.` : "kalorin harcamanın altına inemez."}
-          </p>
-        </Section>
-      </aside>
-    </div>
+      </div>
+    </section>
   );
 }

@@ -27,7 +27,7 @@ function statusLine(goal: "gain" | "lose", rate: number | null, phase: string, w
 export default function Today() {
   const { s } = useApp();
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-4 items-start">
+    <div className="grid grid-cols-1 gap-4 items-start">
       <div className="space-y-4">
         <ProgressHero />
         <RingsCard />
@@ -63,13 +63,13 @@ function ProgressHero() {
   const sign = change > 0 ? "+" : change < 0 ? "−" : "";
 
   return (
-    <section className="panel !p-5 sm:!p-7 relative overflow-hidden">
+    <section className="panel !p-5 relative overflow-hidden">
       <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full grad-me opacity-15" aria-hidden />
       <div className="flex items-center gap-4">
         <Avatar who={s.user} mood={moodFor(s.todayScore.completion)} level={s.scores.me.level.index} size={104} />
         <div>
           <p className="label">{gain ? "Aldığın kilo" : "Verdiğin kilo"}</p>
-          <p className={`display font-bold leading-none num text-6xl sm:text-7xl ${good ? "text-grad" : ""}`}>
+          <p className={`display font-bold leading-none num text-6xl ${good ? "text-grad" : ""}`}>
             {sign}
             {kg(Math.abs(change))}
             <span className="text-2xl font-semibold ml-1" style={{ color: "var(--ink-2)" }}>kg</span>

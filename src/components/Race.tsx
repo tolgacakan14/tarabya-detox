@@ -59,8 +59,8 @@ export default function Race() {
   const maxWeek = Math.max(1, ...me.weeks.map((w) => w.points), ...them.weeks.map((w) => w.points));
 
   return (
-    <div className="grid lg:grid-cols-2 gap-4">
-      <div className="lg:col-span-2">
+    <div className="grid gap-4">
+      <div className="">
         <CoupleMeter />
       </div>
       <TodayTasks />
@@ -142,7 +142,7 @@ export default function Race() {
         )}
       </Section>
 
-      <details className="panel lg:col-span-2">
+      <details className="panel">
         <summary className="display text-xl font-semibold cursor-pointer">Puan nasıl kazanılır?</summary>
         <ul className="divide-y text-sm mt-3" style={{ borderColor: "var(--line)" }}>
           {POINT_RULES.map((r) => (

@@ -30,25 +30,25 @@ export default function ProfilePicker() {
 
   return (
     <main className="min-h-dvh flex flex-col">
-      <header className="px-5 pt-8 pb-4 max-w-5xl w-full mx-auto">
+      <header className="px-5 pt-8 pb-4 max-w-md w-full mx-auto">
         <p className="display text-lg font-semibold">İkimiz</p>
-        <h1 className="display text-4xl sm:text-5xl font-bold mt-6 leading-tight">Bugün kim giriyor?</h1>
+        <h1 className="display text-4xl font-bold mt-6 leading-tight">Bugün kim giriyor?</h1>
       </header>
 
-      <div className="flex-1 grid sm:grid-cols-2 gap-3 px-4 pb-6 max-w-5xl w-full mx-auto">
+      <div className="flex-1 grid gap-3 px-4 pb-6 max-w-md w-full mx-auto">
         {PEOPLE.map((p) => (
           <button
             key={p.id}
             disabled={!!busy}
             onClick={() => login(p.id)}
-            className="relative overflow-hidden text-left rounded-[28px] p-6 sm:p-8 min-h-[38dvh] sm:min-h-[60dvh] flex flex-col justify-end group"
+            className="relative overflow-hidden text-left rounded-[28px] p-6 min-h-[38dvh] flex flex-col justify-end group"
             style={{ background: `var(--${p.id}-soft)`, color: `var(--${p.id}-ink)` }}
           >
             <Tide who={p.id} />
             <div className="relative flex-1 flex items-center justify-center pb-2">
-              <Avatar who={p.id} mood={busy === p.id ? "party" : "happy"} size={160} className="sm:w-[240px] sm:h-[240px]" />
+              <Avatar who={p.id} mood={busy === p.id ? "party" : "happy"} size={160} />
             </div>
-            <span className="relative display font-bold leading-[0.85] text-[18vw] sm:text-[8rem] transition-transform group-hover:-translate-y-1">
+            <span className="relative display font-bold leading-[0.85] text-[clamp(3.5rem,18vw,5.5rem)] transition-transform group-hover:-translate-y-1">
               {p.name}
             </span>
             <span className="relative mt-7 text-lg">{busy === p.id ? "Plan açılıyor…" : p.line}</span>

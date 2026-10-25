@@ -16,7 +16,7 @@ export default function Progress() {
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div className="space-y-4">
         <Section title="Kilo trendi" aside={<span className="label">Günlük tartı dalgalanır, çizgi gerçeği gösterir</span>}>
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -41,7 +41,7 @@ export default function Progress() {
               : "Kas kazanırken tartı yavaş inebilir ama bel incelir. Bel ölçüsü en dürüst göstergen."}
           </p>
           <form
-            className="grid grid-cols-2 sm:grid-cols-5 gap-2"
+            className="grid grid-cols-2 gap-2"
             onSubmit={async (ev) => {
               ev.preventDefault();
               if (await act({ action: "measure", ...Object.fromEntries(Object.entries(m).filter(([, v]) => v).map(([k, v]) => [k, Number(v.replace(",", "."))])) }, { toast: "Ölçüler kaydedildi", points: 20 }))
@@ -62,7 +62,7 @@ export default function Progress() {
                 <input className="field num" inputMode="decimal" value={m[k]} onChange={(ev) => setM({ ...m, [k]: ev.target.value })} />
               </label>
             ))}
-            <button className="btn btn-me col-span-2 sm:col-span-5" disabled={!Object.values(m).some(Boolean)}>
+            <button className="btn btn-me col-span-2" disabled={!Object.values(m).some(Boolean)}>
               Kaydet
             </button>
           </form>

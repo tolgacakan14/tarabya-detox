@@ -14,8 +14,8 @@ export default function CoupleMeter() {
   const theirMood = moodFor(pt.length ? pt.filter((x) => x.done).length / pt.length : 0);
 
   return (
-    <section className="panel !p-4 sm:!p-6">
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:gap-5">
+    <section className="panel !p-4">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
         <div className="text-center">
           <Avatar who={s.user} mood={moodFor(s.todayScore.completion)} level={me.level.index} size={84} />
           <p className="display font-bold mt-1">{s.profile.name}</p>
