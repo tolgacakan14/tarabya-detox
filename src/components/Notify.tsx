@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "./ui";
 
-type Status = { key: string; subscribed: boolean; configured: boolean } | null;
+type Status = { key: string; subscribed: boolean; partnerSubscribed?: boolean; configured: boolean } | null;
 
 const b64 = (s: string) => {
   const pad = "=".repeat((4 - (s.length % 4)) % 4);
@@ -182,6 +182,11 @@ export function NotifySettings() {
           </button>
         </li>
       </ul>
+      {st && (
+        <p className="text-sm mt-2">
+          {st.partnerSubscribed ? `✅ ${s.scores.partner.name}'in telefonunda bildirimler açık.` : `⏳ ${s.scores.partner.name} henüz kendi telefonunda bildirimleri açmadı.`}
+        </p>
+      )}
       <p className="label mt-2">Gece 03:00-08:00 arası sessiz. Günde en fazla 2 hatırlatma.</p>
     </section>
   );

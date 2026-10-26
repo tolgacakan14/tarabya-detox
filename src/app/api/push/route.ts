@@ -6,7 +6,7 @@ import { deleteSubscription, hasSubscription, pushConfigured, saveSubscription, 
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Giriş yapılmadı" }, { status: 401 });
-  return NextResponse.json({ key: VAPID_PUBLIC, subscribed: await hasSubscription(user), configured: pushConfigured() });
+  return NextResponse.json({ key: VAPID_PUBLIC, subscribed: await hasSubscription(user), partnerSubscribed: await hasSubscription(user === "tolga" ? "eylul" : "tolga"), configured: pushConfigured() });
 }
 
 export async function POST(req: Request) {
