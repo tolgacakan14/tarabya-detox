@@ -82,6 +82,20 @@ async function cleanV2(user: UserId, v: unknown, minutes?: number): Promise<Part
   };
 }
 
+/** A love note to the partner's phone, at most 3 partner notifications a day. */
+async function notifyPartner(user: UserId, body: string) {
+  try {
+    const partner = PARTNER[user];
+    const { profile: pp } = await getProfile(partner);
+    if (pp.reminders?.partner === false) return;
+    const sentP = (await list<{ type: string }>(partner, "notif", today(), today())).filter((x) => x.data.type === "partner").length;
+    if (sentP >= 3) return;
+    await sendTo(partner, { title: "İkimiz 💛", body, url: "/app", tag: "partner" }, "partner");
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Foods can be added to the last 7 days ("dün gece yediğimi unuttum"). */
 const pastDay = (v: unknown, d: string) => (v === undefined || v === null || v === "" ? d : validDate(v, addDays(d, -7), d));
 
@@ -267,6 +281,10 @@ async function act(user: UserId, d: string, b: Body) {
         })),
         ...(w.type === "strength" && w.v2 ? await cleanV2(user, w.v2, w.minutes) : {}),
       });
+      if (w.type !== "mini") {
+        const from = user === "tolga" ? "Tolga" : "Eylül";
+        await notifyPartner(user, w.type === "strength" ? `${from} antrenmanını bitirdi 💪 Ona bir beşlik çak, çok sevinir 💛` : `${from} ${w.minutes ?? ""} dk ${w.type === "run" ? "koştu" : "yürüdü"} 🌊 Gururlanma zamanı 💞`);
+      }
       return;
     }
     case "addTodo": {
@@ -357,7 +375,7 @@ async function act(user: UserId, d: string, b: Body) {
         const sentP = (await list<{ type: string }>(partner, "notif", today(), today())).filter((x) => x.data.type === "partner").length;
         if (sentP < 3 && pp.reminders?.partner !== false) {
           const from = user === "tolga" ? "Tolga" : "Eylül";
-          const body = { highfive: `${from} sana beşlik çaktı 🙌`, cheer: `${from} sana tezahürat yapıyor 📣`, proud: `${from} seninle gurur duyuyor 💛`, walk: `${from} seni sahile yürüyüşe çağırıyor 🌊` }[type] ?? `${from} bir şey gönderdi`;
+          const body = { highfive: `${from} sana beşlik çaktı 🙌 Bugün de yanındayım diyor 💛`, cheer: `${from} sana tezahürat yapıyor 📣 Sen yaparsın!`, proud: `${from} seninle çok gurur duyuyor 💛`, walk: `${from} seni sahile, el ele bir yürüyüşe çağırıyor 🌊💞` }[type] ?? `${from} sana bir şey gönderdi 💛`;
           await sendTo(partner, { title: "İkimiz", body, url: "/app", tag: "partner" }, "partner");
         }
       } catch {

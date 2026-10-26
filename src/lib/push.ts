@@ -74,7 +74,7 @@ export async function tickUser(user: UserId): Promise<string[]> {
   const mins = istHour(now) * 60 + Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Istanbul", minute: "2-digit" }).format(now));
   const quiet = mins >= 3 * 60 && mins < 8 * 60;
   if (quiet) return [];
-  const sentToday = await list<{ type: string }>(user, "notif", calToday(), calToday());
+  const sentToday = (await list<{ type: string }>(user, "notif", calToday(), calToday())).filter((x) => x.data.type !== "test");
   const reminderCount = sentToday.filter((x) => x.data.type !== "partner").length;
   const already = (t: string) => sentToday.some((x) => x.data.type === t);
   if (reminderCount >= 2) return [];
@@ -87,16 +87,57 @@ export async function tickUser(user: UserId): Promise<string[]> {
     return d >= 0 && d < span;
   };
 
+  const me = profile.name;
+  const love = user === "tolga" ? "Eylül" : "Tolga";
+  const pet = user === "tolga" ? "yakışıklım" : "güzelim";
   if (inWindow(r.weigh) && s.weighedToday === undefined && !already("weigh"))
-    due.push({ type: "weigh", payload: { title: pick(["Günaydın ☀️", "Sabah tartısı ⚖️", "Tartıya 10 saniye?"], seed), body: pick(["Tuvaletten sonra, kahvaltıdan önce tartıl; trendin daha net çıksın.", "Bugünün tartısı eksik. Kaydırmalı cetvelle 5 saniye sürer.", "Bir tartı, bütün plan senin verine göre ayarlansın."], seed), url: "/app", tag: "weigh" } });
+    due.push({
+      type: "weigh",
+      payload: {
+        title: pick([`Günaydın ${pet} ☀️`, `${love} seni düşünüyor 💛`, "Güne birlikte başlayalım 🌅"], seed),
+        body: pick(
+          [
+            `Tartıya bir çık, sonra kahvaltıya. ${love} da bugün yolunda, ikiniz bir takımsınız 💛`,
+            "5 saniyelik tartı, bütün günün planı sana göre ayarlansın. Seninle gurur duyuyorum 🌸",
+            `Sabah tartısı hâlâ bekliyor. ${love} ile aynı yoldasınız, adım adım 💞`,
+          ],
+          seed
+        ),
+        url: "/app",
+        tag: "weigh",
+      },
+    });
 
   const mealAt = profile.id === "tolga" ? "14:30" : "13:00";
   if (r.meal && inWindow(mealAt, 180) && s.foods.length === 0 && !already("meal"))
-    due.push({ type: "meal", payload: { title: pick(["Bugün ne yedin? 😋", "Öğün kaydı", "Hızlı bir kayıt?"], seed), body: pick(["Henüz öğün yok. Fotoğraf çek ya da 'kahvaltım' tuşuna bas, gerisini ben hesaplarım.", "Tek dokunuşla ekle; kalori ve proteini ben tutarım.", "Yediğini söyle ya da yaz, 10 saniye."], seed), url: "/app", tag: "meal" } });
+    due.push({
+      type: "meal",
+      payload: {
+        title: pick([`${love} merak ediyor: bugün ne yedin? 💛`, `Kendine iyi bak ${pet} 🍽️`, "Bir öğün, bir gülümseme 😋"], seed),
+        body: pick(
+          [
+            "Henüz bir öğün görünmüyor. Tabağının fotoğrafını çek, gerisini ben hesaplarım.",
+            user === "tolga" ? "Kas kalorisiz büyümez aşkım. Bir şey ye ve tek dokunuşla ekle 💪" : "Öğün atlamak yok güzelim, açlık birikmesin. Ne yediysen ekle 🌸",
+            `Yediğini söyle ya da yaz, 10 saniye. ${love} da bugün kaydediyor 💞`,
+          ],
+          seed
+        ),
+        url: "/app",
+        tag: "meal",
+      },
+    });
 
   if (r.dayEnd && inWindow(r.dayEnd, 90) && s.day.manual && !s.day.pending && !already("dayEnd")) {
     const meals = new Set(s.foods.map((f) => f.meal ?? f.name)).size;
-    due.push({ type: "dayEnd", payload: { title: "Günü kapatmadan 🌙", body: meals < 2 ? `Bugün ${meals} öğün görünüyor. Eksik varsa ekle, sonra günü bitir.` : "Özetine bak ve yeni güne geç. İyi uykular!", url: "/app", tag: "dayEnd" } });
+    due.push({
+      type: "dayEnd",
+      payload: {
+        title: pick([`İyi geceler ${pet} 🌙`, "Günü birlikte kapatalım 🌙", `${love} sana iyi geceler diyor 💛`], seed),
+        body: meals < 2 ? `Bugün ${meals} öğün görünüyor. Eksik varsa ekle, sonra günü bitir. Yarın yine birlikteyiz 💞` : "Bugün harikaydın. Özetine bak, günü bitir ve güzel uyu 💫",
+        url: "/app",
+        tag: "dayEnd",
+      },
+    });
   }
 
   const out: string[] = [];
@@ -105,3 +146,20 @@ export async function tickUser(user: UserId): Promise<string[]> {
 }
 
 export const pushConfigured = configured;
+
+/** Run the reminder check for both of us, at most once every 10 minutes (whoever triggers it). */
+export async function tickAllThrottled(): Promise<boolean> {
+  const marks = await list<{ at: number }>("system", "notif", "0000-00-00", "0000-00-00");
+  const last = marks[0];
+  if (last && Date.now() - last.data.at < 10 * 60 * 1000) return false;
+  if (last) await remove("system", last.id);
+  await add("system", "notif", "0000-00-00", { at: Date.now() });
+  for (const u of ["tolga", "eylul"] as const) {
+    try {
+      await tickUser(u);
+    } catch (e) {
+      console.error("tick", u, (e as Error).message);
+    }
+  }
+  return true;
+}

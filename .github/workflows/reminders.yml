@@ -1,13 +1,31 @@
 name: Hatırlatıcılar
-# Every 15 minutes, ask the app whether a push reminder is due. The endpoint is safe to call any time:
-# it only sends what is due, once per type per day, max 2 a day, never at night.
+# GitHub's own cron is unreliable for small repos (runs can be hours late), so this job stays alive for
+# ~5h45m, asks the app every 5 minutes whether a reminder is due, then restarts itself.
+# The endpoint is throttled and only sends what is due (max 2 reminders a day, never at night).
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "7 */6 * * *"
   workflow_dispatch:
+permissions:
+  actions: write
+concurrency:
+  group: reminders
+  cancel-in-progress: false
 jobs:
-  tick:
+  loop:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 355
     steps:
-      - run: curl -fsS --max-time 60 https://ikimiz-app.vercel.app/api/push/tick
+      - name: Her 5 dakikada bir kontrol
+        run: |
+          end=$(( $(date +%s) + 345*60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            curl -fsS --max-time 60 https://ikimiz-app.vercel.app/api/push/tick || true
+            echo
+            sleep 300
+          done
+      - name: Kendini yeniden başlat
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run reminders.yml --repo ${{ github.repository }} || true
