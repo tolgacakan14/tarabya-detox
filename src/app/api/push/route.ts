@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { list } from "@/lib/store";
 import { addDays, today } from "@/lib/dates";
 import { getSession } from "@/lib/session";
-import { deleteSubscription, hasSubscription, pushConfigured, saveSubscription, sendTo, VAPID_PUBLIC } from "@/lib/push";
+import { devices, deleteSubscription, hasSubscription, pushConfigured, saveSubscription, sendTo, VAPID_PUBLIC } from "@/lib/push";
 
 // GET: status + public key. POST: save this device. DELETE: remove it. PUT: send a test notification.
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Giriş yapılmadı" }, { status: 401 });
   const recent = (await list<{ type: string; at: string }>(user, "notif", addDays(today(), -3), today())).map((r) => ({ type: r.data.type, at: r.data.at })).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 10);
-  return NextResponse.json({ key: VAPID_PUBLIC, subscribed: await hasSubscription(user), partnerSubscribed: await hasSubscription(user === "tolga" ? "eylul" : "tolga"), configured: pushConfigured(), recent });
+  return NextResponse.json({ key: VAPID_PUBLIC, subscribed: await hasSubscription(user), partnerSubscribed: await hasSubscription(user === "tolga" ? "eylul" : "tolga"), configured: pushConfigured(), recent, devices: await devices(user) });
 }
 
 export async function POST(req: Request) {
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const b = (await req.json().catch(() => null)) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } } | null;
   const ok = b && typeof b.endpoint === "string" && /^https:\/\//.test(b.endpoint) && b.endpoint.length < 1000 && typeof b.keys?.p256dh === "string" && typeof b.keys?.auth === "string";
   if (!ok) return NextResponse.json({ error: "Geçersiz abonelik" }, { status: 400 });
-  await saveSubscription(user, { endpoint: b!.endpoint as string, keys: { p256dh: String(b!.keys!.p256dh).slice(0, 200), auth: String(b!.keys!.auth).slice(0, 100) } }, req.headers.get("user-agent") ?? undefined);
+  await saveSubscription(user, { endpoint: b!.endpoint as string, keys: { p256dh: String(b!.keys!.p256dh).slice(0, 200), auth: String(b!.keys!.auth).slice(0, 100) } }, req.headers.get("user-agent") ?? undefined, req.headers.get("origin") ?? undefined);
   return NextResponse.json({ ok: true });
 }
 

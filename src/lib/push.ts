@@ -17,17 +17,22 @@ function init() {
   ready = true;
 }
 
-type Sub = { endpoint: string; keys: { p256dh: string; auth: string }; ua?: string };
+type Sub = { endpoint: string; keys: { p256dh: string; auth: string }; ua?: string; origin?: string };
+const HOME = "https://ikimiz-app.vercel.app";
 export type Payload = { title: string; body: string; url?: string; tag?: string };
 
-export async function saveSubscription(user: UserId, sub: Sub, ua?: string) {
+export async function saveSubscription(user: UserId, sub: Sub, ua?: string, origin?: string) {
   const existing = await list<Sub>(user, "push", "0000-00-00", "0000-00-00");
   for (const r of existing) if (r.data.endpoint === sub.endpoint) await remove(user, r.id);
-  await add<Sub>(user, "push", "0000-00-00", { endpoint: sub.endpoint, keys: sub.keys, ua: ua?.slice(0, 120) });
+  await add<Sub>(user, "push", "0000-00-00", { endpoint: sub.endpoint, keys: sub.keys, ua: ua?.slice(0, 120), origin: origin && /^https:\/\/[a-z0-9.-]+$/.test(origin) ? origin : undefined });
 }
 
 export async function deleteSubscription(user: UserId, endpoint: string) {
   for (const r of await list<Sub>(user, "push", "0000-00-00", "0000-00-00")) if (r.data.endpoint === endpoint) await remove(user, r.id);
+}
+
+export async function devices(user: UserId) {
+  return (await list<Sub>(user, "push", "0000-00-00", "0000-00-00")).map((r) => ({ ua: r.data.ua ?? "", origin: r.data.origin ?? HOME, host: new URL(r.data.endpoint).host }));
 }
 
 export async function hasSubscription(user: UserId) {
@@ -42,11 +47,12 @@ export async function sendTo(user: UserId, payload: Payload, type: string) {
   let sent = 0;
   for (const s of subs) {
     try {
-      await webpush.sendNotification({ endpoint: s.data.endpoint, keys: s.data.keys }, JSON.stringify({ ...payload, web_push: 8030, notification: { title: payload.title, body: payload.body, navigate: payload.url ?? "/app" } }), { TTL: 3600 });
+      await webpush.sendNotification({ endpoint: s.data.endpoint, keys: s.data.keys }, JSON.stringify({ ...payload, web_push: 8030, notification: { title: payload.title, body: payload.body, navigate: new URL(payload.url ?? "/app", s.data.origin ?? HOME).href, tag: payload.tag } }), { TTL: 3600 });
       sent++;
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode;
       if (code === 404 || code === 410) await remove(user, s.id);
+      else console.error("push", user, code, (e as Error).message?.slice(0, 200));
     }
   }
   if (sent) await add(user, "notif", calToday(), { type, at: new Date().toISOString() });
