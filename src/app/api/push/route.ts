@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { list } from "@/lib/store";
+import { addDays, today } from "@/lib/dates";
 import { getSession } from "@/lib/session";
 import { deleteSubscription, hasSubscription, pushConfigured, saveSubscription, sendTo, VAPID_PUBLIC } from "@/lib/push";
 
@@ -6,7 +8,8 @@ import { deleteSubscription, hasSubscription, pushConfigured, saveSubscription, 
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Giriş yapılmadı" }, { status: 401 });
-  return NextResponse.json({ key: VAPID_PUBLIC, subscribed: await hasSubscription(user), partnerSubscribed: await hasSubscription(user === "tolga" ? "eylul" : "tolga"), configured: pushConfigured() });
+  const recent = (await list<{ type: string; at: string }>(user, "notif", addDays(today(), -3), today())).map((r) => ({ type: r.data.type, at: r.data.at })).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 10);
+  return NextResponse.json({ key: VAPID_PUBLIC, subscribed: await hasSubscription(user), partnerSubscribed: await hasSubscription(user === "tolga" ? "eylul" : "tolga"), configured: pushConfigured(), recent });
 }
 
 export async function POST(req: Request) {
