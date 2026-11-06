@@ -9,13 +9,14 @@ export async function GET(req: Request) {
   // the scheduler uses the throttled path; ?force=1 is only for checking by hand
   if (!new URL(req.url).searchParams.has("force")) return NextResponse.json({ ok: true, ran: await tickAllThrottled() });
   const out: Record<string, string[]> = {};
+  const why: Record<string, string[]> = { tolga: [], eylul: [] };
   for (const u of ["tolga", "eylul"] as const) {
     try {
-      out[u] = await tickUser(u);
+      out[u] = await tickUser(u, why[u]);
     } catch (e) {
       console.error("tick", u, (e as Error).message);
       out[u] = [];
     }
   }
-  return NextResponse.json({ ok: true, sent: out });
+  return NextResponse.json({ ok: true, sent: out, why });
 }

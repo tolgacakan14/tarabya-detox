@@ -65,19 +65,20 @@ export function defaultReminders(p: Profile): Required<NonNullable<Profile["remi
 }
 
 /** Evaluate reminders for one user right now; called every ~15 minutes by the scheduler. */
-export async function tickUser(user: UserId): Promise<string[]> {
-  if (!(await hasSubscription(user))) return [];
+export async function tickUser(user: UserId, why?: string[]): Promise<string[]> {
+  const note = (m: string) => why?.push(m);
+  if (!(await hasSubscription(user))) return note("abonelik yok"), [];
   const { profile } = await getProfile(user);
   const r = defaultReminders(profile);
   const s = await buildState(user);
   const now = new Date();
   const mins = istHour(now) * 60 + Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Istanbul", minute: "2-digit" }).format(now));
   const quiet = mins >= 3 * 60 && mins < 8 * 60;
-  if (quiet) return [];
+  if (quiet) return note("sessiz saat"), [];
   const sentToday = (await list<{ type: string }>(user, "notif", calToday(), calToday())).filter((x) => x.data.type !== "test");
   const reminderCount = sentToday.filter((x) => x.data.type !== "partner").length;
   const already = (t: string) => sentToday.some((x) => x.data.type === t);
-  if (reminderCount >= 2) return [];
+  if (reminderCount >= 2) return note("bugün 2 hatırlatma gitti"), [];
   const seed = now.getDate();
   const due: { type: string; payload: Payload }[] = [];
   const inWindow = (t: string | null | undefined, span = 120) => {
@@ -90,7 +91,11 @@ export async function tickUser(user: UserId): Promise<string[]> {
   const me = profile.name;
   const love = user === "tolga" ? "Eylül" : "Tolga";
   const pet = user === "tolga" ? "yakışıklım" : "güzelim";
-  if (inWindow(r.weigh) && s.weighedToday === undefined && !already("weigh"))
+  // after midnight a manual-day user is still "on yesterday" (pending): judge the morning by the calendar day
+  const cal = s.day.calendar;
+  const weighed = s.weightLog.some((w) => w.date === cal || (!s.day.pending && w.date === s.today));
+  note(`saat ${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, "0")}, gün ${s.today}${s.day.pending ? " (bekleyen)" : ""}, tartı ${weighed ? "var" : "yok"}, öğün ${s.foods.length}`);
+  if (inWindow(r.weigh) && !weighed && !already("weigh"))
     due.push({
       type: "weigh",
       payload: {
@@ -109,7 +114,7 @@ export async function tickUser(user: UserId): Promise<string[]> {
     });
 
   const mealAt = profile.id === "tolga" ? "14:30" : "13:00";
-  if (r.meal && inWindow(mealAt, 180) && s.foods.length === 0 && !already("meal"))
+  if (r.meal && inWindow(mealAt, 180) && !s.day.pending && s.foods.length === 0 && !already("meal"))
     due.push({
       type: "meal",
       payload: {
@@ -127,7 +132,9 @@ export async function tickUser(user: UserId): Promise<string[]> {
       },
     });
 
-  if (r.dayEnd && inWindow(r.dayEnd, 90) && s.day.manual && !s.day.pending && !already("dayEnd")) {
+  // still on yesterday after midnight (pending) is exactly when "close your day" matters; before midnight it's the calendar day
+  const dayOpen = s.day.pending || (mins >= 12 * 60 && s.today === cal);
+  if (r.dayEnd && inWindow(r.dayEnd, 90) && s.day.manual && dayOpen && !already("dayEnd")) {
     const meals = new Set(s.foods.map((f) => f.meal ?? f.name)).size;
     due.push({
       type: "dayEnd",
@@ -141,7 +148,12 @@ export async function tickUser(user: UserId): Promise<string[]> {
   }
 
   const out: string[] = [];
-  for (const d of due.slice(0, 2 - reminderCount)) if (await sendTo(user, d.payload, d.type)) out.push(d.type);
+  if (!due.length) note("şu an zamanı gelen hatırlatma yok");
+  for (const d of due.slice(0, 2 - reminderCount)) {
+    const n = await sendTo(user, d.payload, d.type);
+    if (n) out.push(d.type);
+    else note(`${d.type} gönderilemedi`);
+  }
   return out;
 }
 
