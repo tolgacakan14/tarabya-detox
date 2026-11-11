@@ -31,7 +31,8 @@ export interface Rec<T = Record<string, unknown>> {
   created_at: string;
 }
 
-const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+// IKIMIZ2_*: the second free Neon database (the first one ran out of its monthly compute quota)
+const url = process.env.IKIMIZ2_DATABASE_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL;
 const sql = url ? neon(url) : null;
 
 let ready: Promise<void> | null = null;
