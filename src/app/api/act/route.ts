@@ -403,6 +403,12 @@ async function act(user: UserId, d: string, b: Body) {
       if (typeof patch.cycleTracking === "boolean") next.cycleTracking = patch.cycleTracking;
       if (patch.intensity === "standard" || patch.intensity === "intense") next.intensity = patch.intensity;
       if (typeof patch.onboarded === "boolean") next.onboarded = patch.onboarded;
+      // program start (repair after a database move); never in the future
+      if (typeof patch.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(patch.startDate) && patch.startDate <= d && patch.startDate >= "2026-01-01") {
+        if (next.deficitStart === next.startDate) next.deficitStart = patch.startDate;
+        next.startDate = patch.startDate;
+        if (next.activeDate && next.activeDate < next.startDate) next.activeDate = undefined;
+      }
       await saveProfile(user, next);
       if (patch.startWeight !== undefined && !(await list(user, "weight", d, d)).length) {
         await setDaily(user, "weight", d, { kg: next.startWeight });
