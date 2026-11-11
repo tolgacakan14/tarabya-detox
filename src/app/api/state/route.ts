@@ -2,11 +2,14 @@ import { NextResponse, after } from "next/server";
 import { getSession } from "@/lib/session";
 import { buildState } from "@/lib/state";
 import { tickAllThrottled } from "@/lib/push";
+import { restoreOld } from "@/lib/restore";
 
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Giriş yapılmadı" }, { status: 401 });
   // whenever either of us opens the app, quietly check whether the other needs a reminder
   after(() => tickAllThrottled().catch(() => {}));
+  // old records come back by themselves once the first database is reachable again (tried once a day)
+  after(() => restoreOld().catch(() => {}));
   return NextResponse.json(await buildState(user));
 }

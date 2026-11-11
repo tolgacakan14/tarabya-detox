@@ -31,6 +31,22 @@ export function usePush() {
   useEffect(() => {
     load();
   }, []);
+  // The phone keeps its push subscription even if the server lost it (e.g. a database move):
+  // if permission is already granted, hand the existing subscription back silently. No tap needed.
+  useEffect(() => {
+    if (!st || st.subscribed || !env().supported || Notification.permission !== "granted") return;
+    (async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        const sub = await reg?.pushManager.getSubscription();
+        if (!sub) return;
+        const r = await fetch("/api/push", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+        if (r.ok) load();
+      } catch {
+        /* the card still offers the button */
+      }
+    })();
+  }, [st]);
   async function enable() {
     setBusy(true);
     setMsg("");
