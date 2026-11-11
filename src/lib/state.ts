@@ -40,7 +40,7 @@ export async function getProfile(user: UserId): Promise<{ profile: Profile; id?:
   if (recs.length) return { profile: { ...defaultProfile(user, recs[0].data.startDate), ...recs[0].data }, id: recs[0].id };
   // Both partners share the same program start date
   const other = await list<Profile>(PARTNER[user], "profile", PROFILE_DATE, PROFILE_DATE);
-  const start = other[0]?.data.startDate ?? todayFn();
+  const start = other[0]?.data.startDate ?? "2026-10-25"; // our program started on 25 Oct (kept when the database is replaced)
   const p = defaultProfile(user, start);
   await setDaily(user, "profile", PROFILE_DATE, p);
   return { profile: p };

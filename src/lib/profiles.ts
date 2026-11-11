@@ -112,7 +112,7 @@ export function defaultProfile(id: UserId, startDate: string): Profile {
     sex: "f",
     age: 22,
     heightCm: 158,
-    startWeight: 55,
+    startWeight: 57,
     targetWeight: 50,
     goal: "lose",
     startDate,
