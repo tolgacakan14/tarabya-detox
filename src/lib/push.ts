@@ -2,7 +2,7 @@
 // Rules (HeartSteps / JITAI evidence): only when something is actually missing, at most 2 reminders a day,
 // quiet at night, rotate the wording, never guilt.
 import webpush from "web-push";
-import { add, list, remove, type UserId } from "./store";
+import { add, list, remove, update, type UserId } from "./store";
 import { buildState, getProfile } from "./state";
 import { istHour, today as calToday } from "./dates";
 import type { Profile } from "./profiles";
@@ -23,8 +23,14 @@ export type Payload = { title: string; body: string; url?: string; tag?: string 
 
 export async function saveSubscription(user: UserId, sub: Sub, ua?: string, origin?: string) {
   const existing = await list<Sub>(user, "push", "0000-00-00", "0000-00-00");
-  for (const r of existing) if (r.data.endpoint === sub.endpoint) await remove(user, r.id);
-  await add<Sub>(user, "push", "0000-00-00", { endpoint: sub.endpoint, keys: sub.keys, ua: ua?.slice(0, 120), origin: origin && /^https:\/\/[a-z0-9.-]+$/.test(origin) ? origin : undefined });
+  const data: Sub = { endpoint: sub.endpoint, keys: sub.keys, ua: ua?.slice(0, 120), origin: origin && /^https:\/\/[a-z0-9.-]+$/.test(origin) ? origin : undefined };
+  const matches = existing.filter((r) => r.data.endpoint === sub.endpoint);
+  if (matches.length) {
+    const previous = matches[0].data;
+    if (previous.keys.p256dh !== data.keys.p256dh || previous.keys.auth !== data.keys.auth || previous.ua !== data.ua || previous.origin !== data.origin)
+      await update(user, matches[0].id, data);
+    for (const duplicate of matches.slice(1)) await remove(user, duplicate.id);
+  } else await add<Sub>(user, "push", "0000-00-00", data);
 }
 
 export async function deleteSubscription(user: UserId, endpoint: string) {
@@ -40,12 +46,13 @@ export async function hasSubscription(user: UserId) {
 }
 
 /** Send to every device of a user; drop subscriptions the push service says are gone. */
-export async function sendTo(user: UserId, payload: Payload, type: string) {
+export async function sendTo(user: UserId, payload: Payload, type: string, endpoint?: string) {
   init();
   if (!ready) return 0;
   const subs = await list<Sub>(user, "push", "0000-00-00", "0000-00-00");
   let sent = 0;
   for (const s of subs) {
+    if (endpoint && s.data.endpoint !== endpoint) continue;
     try {
       await webpush.sendNotification({ endpoint: s.data.endpoint, keys: s.data.keys }, JSON.stringify({ ...payload, web_push: 8030, notification: { title: payload.title, body: payload.body, navigate: new URL(payload.url ?? "/app", s.data.origin ?? HOME).href, tag: payload.tag } }), { TTL: 3600 });
       sent++;
@@ -94,7 +101,6 @@ export async function tickUser(user: UserId, why?: string[]): Promise<string[]> 
     return d >= 0 && d < span;
   };
 
-  const me = profile.name;
   const love = user === "tolga" ? "Eylül" : "Tolga";
   const pet = user === "tolga" ? "yakışıklım" : "güzelim";
   // after midnight a manual-day user is still "on yesterday" (pending): judge the morning by the calendar day

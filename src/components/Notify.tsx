@@ -1,6 +1,6 @@
 "use client";
 // Turning on push reminders: never asks on load, only from a tap; explains the iPhone home-screen step.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApp } from "./ui";
 
 type Status = { key: string; subscribed: boolean; partnerSubscribed?: boolean; configured: boolean } | null;
@@ -23,69 +23,92 @@ export function usePush() {
   const [st, setSt] = useState<Status>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const load = () =>
-    fetch("/api/push")
-      .then((r) => r.json())
-      .then(setSt)
-      .catch(() => {});
-  useEffect(() => {
-    load();
-  }, []);
-  // The phone keeps its push subscription even if the server lost it (e.g. a database move):
-  // if permission is already granted, hand the existing subscription back silently. No tap needed.
-  useEffect(() => {
-    if (!st || st.subscribed || !env().supported || Notification.permission !== "granted") return;
-    (async () => {
-      try {
+  const [loadError, setLoadError] = useState("");
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch("/api/push", { cache: "no-store" });
+      if (!response.ok) throw new Error("Bildirim durumu alınamadı. Tekrar dene.");
+      const status = await response.json() as NonNullable<Status>;
+      // Account-wide subscriptions do not prove that THIS browser is registered.
+      let subscribed = false;
+      if (env().supported && Notification.permission === "granted") {
         const reg = await navigator.serviceWorker.getRegistration();
         const sub = await reg?.pushManager.getSubscription();
-        if (!sub) return;
-        const r = await fetch("/api/push", { method: "POST", body: JSON.stringify(sub.toJSON()) });
-        if (r.ok) load();
-      } catch {
-        /* the card still offers the button */
+        if (sub) {
+          // Restore this exact device even when another phone is already registered.
+          const saved = await fetch("/api/push", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+          if (!saved.ok) throw new Error("Bu cihazın aboneliği sunucuya kaydedilemedi. Tekrar dene.");
+          subscribed = true;
+        }
       }
-    })();
-  }, [st]);
+      setSt({ ...status, subscribed });
+      setLoadError("");
+    } catch (error) {
+      setSt(null);
+      setLoadError(error instanceof Error ? error.message : "Bildirim durumu alınamadı.");
+    }
+  }, []);
+  useEffect(() => {
+    // The async request synchronizes browser/server subscription state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  async function testDevice() {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) throw new Error("Bu cihazda abonelik yok. Önce bildirimleri aç.");
+    const response = await fetch("/api/push", { method: "PUT", body: JSON.stringify({ endpoint: sub.endpoint }) });
+    const result = await response.json();
+    if (!response.ok || !result.ok || !(result.sent > 0))
+      throw new Error(result.error || "Deneme bildirimi bu cihaza gönderilemedi.");
+    setMsg("Deneme bu cihazın bildirim servisine iletildi 💛 Telefonda göründüğünü kontrol et.");
+  }
+  async function test() {
+    setBusy(true);
+    setMsg("");
+    try { await testDevice(); }
+    catch (error) { setMsg(error instanceof Error ? error.message : "Deneme gönderilemedi."); }
+    finally { setBusy(false); }
+  }
   async function enable() {
     setBusy(true);
     setMsg("");
     try {
+      if (!st?.configured) throw new Error("Bildirim servisi şu an hazır değil. Biraz sonra tekrar dene.");
+      if (!env().supported) throw new Error("Bu tarayıcı bildirimleri desteklemiyor.");
       const perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        setMsg("İzin verilmedi. Telefonun ayarlarından bu uygulamaya bildirim izni verebilirsin.");
-        return;
-      }
-      const reg = await navigator.serviceWorker.register("/sw.js");
+      if (perm !== "granted") throw new Error("İzin verilmedi. Telefon ayarlarından bu uygulamaya bildirim izni verebilirsin.");
+      const reg = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
       await navigator.serviceWorker.ready;
-      const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(st?.key ?? "") }));
-      const r = await fetch("/api/push", { method: "POST", body: JSON.stringify(sub.toJSON()) });
-      if (!r.ok) throw new Error();
-      const t = await fetch("/api/push", { method: "PUT" });
-      setMsg(t.ok ? "Açıldı! Deneme bildirimi gönderdim 💛" : "Açıldı. Sunucu anahtarı eklenince bildirimler gelmeye başlayacak.");
+      const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(st.key) }));
+      const response = await fetch("/api/push", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+      if (!response.ok) throw new Error("Bu cihaz kaydedilemedi. Tekrar dene.");
       await load();
-    } catch {
-      setMsg("Bildirim açılamadı. Uygulamayı ana ekrandan açtığından emin ol ve tekrar dene.");
-    } finally {
-      setBusy(false);
-    }
+      // A successful HTTP request alone is not proof of push delivery.
+      await testDevice();
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Bildirim açılamadı. Uygulamayı ana ekrandan açıp tekrar dene.");
+    } finally { setBusy(false); }
   }
   async function disable() {
     setBusy(true);
+    setMsg("");
     try {
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = await reg?.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/push", { method: "DELETE", body: JSON.stringify({ endpoint: sub.endpoint }) });
-        await sub.unsubscribe();
+        const response = await fetch("/api/push", { method: "DELETE", body: JSON.stringify({ endpoint: sub.endpoint }) });
+        if (!response.ok) throw new Error("Sunucuya ulaşılamadı; bildirimler kapatılamadı. Tekrar dene.");
+        if (!(await sub.unsubscribe())) throw new Error("Cihaz aboneliği kapatılamadı. Tekrar dene.");
       }
       await load();
-      setMsg("Bu telefonda bildirimler kapatıldı.");
-    } finally {
-      setBusy(false);
-    }
+      setMsg("Bu cihazda bildirimler kapatıldı.");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Bildirimler kapatılamadı. Tekrar dene.");
+    } finally { setBusy(false); }
   }
-  return { st, busy, msg, enable, disable };
+  return { st, busy, msg: msg || loadError, enable, disable, test, reload: load };
 }
 
 /** Card on Today until this device has reminders on (dismissable for a week). */
@@ -97,6 +120,8 @@ export function NotifyCard() {
   useEffect(() => {
     try {
       const until = Number(localStorage.getItem("notif-later") || 0);
+      // Read the device-only dismissal after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHidden(Date.now() < until);
     } catch {
       setHidden(false);
@@ -124,12 +149,12 @@ export function NotifyCard() {
           Sadece eksik bir şey varsa (tartı, öğün, günü kapatma) ve günde en fazla 2 kez. {s.scores.partner.name} beşlik çakınca da haber veririm.
         </p>
       )}
-      {msg && <p className="text-sm mt-2 font-semibold relative">{msg}</p>}
+      {msg && <p role="status" className="text-sm mt-2 font-semibold relative">{msg}</p>}
       <div className="grid grid-cols-[auto_1fr] gap-2 mt-3 relative">
         <button className="btn btn-ghost press" onClick={later}>
           Şimdi değil
         </button>
-        <button className="btn btn-me press" disabled={busy || !e.supported || (e.ios && !e.standalone)} onClick={enable}>
+        <button className="btn btn-me press" disabled={busy || !st?.configured || !e.supported || (e.ios && !e.standalone)} onClick={enable}>
           {busy ? "Açılıyor…" : "Bildirimleri aç"}
         </button>
       </div>
@@ -140,12 +165,12 @@ export function NotifyCard() {
 /** Settings panel (İlerleme): which reminders and when. */
 export function NotifySettings() {
   const { s, act } = useApp();
-  const { st, busy, msg, enable, disable } = usePush();
+  const { st, busy, msg, enable, disable, test, reload } = usePush();
   const e = env();
   const r = {
     weigh: s.profile.reminders?.weigh !== undefined ? s.profile.reminders.weigh : s.user === "tolga" ? "11:30" : "08:30",
     meal: s.profile.reminders?.meal ?? true,
-    dayEnd: s.profile.reminders?.dayEnd !== undefined ? s.profile.reminders.dayEnd : s.user === "tolga" ? "01:30" : "23:30",
+    dayEnd: s.profile.reminders?.dayEnd !== undefined ? s.profile.reminders.dayEnd : s.profile.dayMode === "calendar" ? null : s.user === "tolga" ? "01:30" : "23:30",
     partner: s.profile.reminders?.partner ?? true,
   };
   const set = (patch: Record<string, unknown>) => act({ action: "reminders", ...patch }, { toast: "Kaydedildi" });
@@ -158,14 +183,19 @@ export function NotifySettings() {
             Bu telefonda açık · kapat
           </button>
         ) : (
-          <button className="chip press" disabled={busy || !e.supported || (e.ios && !e.standalone)} onClick={enable}>
+          <button className="chip press" disabled={busy || !st?.configured || !e.supported || (e.ios && !e.standalone)} onClick={enable}>
             Bu telefonda aç
           </button>
         )}
       </div>
       {e.ios && !e.standalone && !st?.subscribed && <p className="label mt-1">iPhone: önce Paylaş → Ana Ekrana Ekle, sonra ana ekrandan aç.</p>}
-      {st && !st.configured && <p className="label mt-1">Sunucu bildirim anahtarı henüz eklenmedi; açabilirsin, anahtar eklenince gelmeye başlar.</p>}
-      {msg && <p className="text-sm mt-1">{msg}</p>}
+      {st && !st.configured && <p className="label mt-1">Bildirim servisi şu an hazır değil; daha sonra tekrar dene.</p>}
+      {msg && <p className="text-sm mt-1" role="status">{msg}</p>}
+      <div className="flex flex-wrap gap-2 mt-3">
+        {st?.subscribed && <button className="chip press" disabled={busy} onClick={test}>Deneme bildirimi gönder</button>}
+        <button className="chip press" disabled={busy} onClick={() => void reload()}>Durumu yenile</button>
+      </div>
+      {!e.supported && !(e.ios && !e.standalone) && <p className="label mt-1">Bu tarayıcı bildirimleri desteklemiyor. Destekleyen bir tarayıcıdan aç.</p>}
       <ul className="mt-3 space-y-2 text-sm">
         <li className="flex items-center justify-between gap-2 min-h-[44px]">
           <span>⚖️ Tartı hatırlatması (tartılmadıysan)</span>

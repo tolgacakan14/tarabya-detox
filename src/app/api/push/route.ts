@@ -30,10 +30,14 @@ export async function DELETE(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
-export async function PUT() {
+export async function PUT(req: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Giriş yapılmadı" }, { status: 401 });
   if (!pushConfigured()) return NextResponse.json({ error: "Bildirim anahtarı sunucuda henüz tanımlı değil." }, { status: 503 });
-  const n = await sendTo(user, { title: "İkimiz 💛", body: "Bildirimler çalışıyor! Sadece eksik bir şey olunca, günde en fazla 2 kez yazacağım.", url: "/app", tag: "test" }, "test");
-  return NextResponse.json({ ok: n > 0, sent: n });
+  const b = await req.json().catch(() => null) as { endpoint?: unknown } | null;
+  if (typeof b?.endpoint !== "string" || !b.endpoint.startsWith("https://") || b.endpoint.length > 1000)
+    return NextResponse.json({ error: "Denemek istediğin cihazın aboneliği bulunamadı." }, { status: 400 });
+  const n = await sendTo(user, { title: "İkimiz 💛", body: "Bildirimler çalışıyor! Sadece eksik bir şey olunca, günde en fazla 2 kez yazacağım.", url: "/app", tag: "test" }, "test", b.endpoint);
+  if (!n) return NextResponse.json({ ok: false, sent: 0, error: "Deneme bu cihaza gönderilemedi. Bildirimleri yeniden bağlayıp tekrar dene." }, { status: 502 });
+  return NextResponse.json({ ok: true, sent: n });
 }

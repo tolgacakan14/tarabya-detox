@@ -18,3 +18,12 @@ Tolga ve Eylül için kişiye özel beslenme, antrenman ve motivasyon uygulamas�
 | `GROQ_MODEL` / `GEMINI_MODEL` | İsteğe bağlı, boşsa uygun model otomatik seçilir |
 
 `DATABASE_URL` yoksa uygulama geçici bellek kullanır; veriler kalıcı değildir.
+
+## Bildirimler
+
+İlerleme → Bildirimler bölümündeki durum bu tarayıcının aboneliğini gösterir. Başka bir cihazın açık olması bu cihazı açık göstermez. Mevcut izinli cihaz aboneliği uygulama açıldığında sunucuya yeniden kaydedilir; aynı kayıt değişmediyse yeniden yazılmaz.
+
+- **Durumu yenile:** cihaz ve sunucu durumunu yeniden kontrol eder.
+- **Deneme bildirimi gönder:** yalnız bu cihazı hedefler. Servisin isteği kabul etmesi telefon ekranında görüntülendiği anlamına gelmez; kullanıcı cihazından doğrular.
+- Tartı/öğün/gün sonu saatleri, günlük iki hatırlatma sınırı ve sessiz saatler korunur.
+- Testler: `npm test`. Testler taklit push servisi ve kayıt deposu kullanır; gerçek cihazlara bildirim göndermez.
